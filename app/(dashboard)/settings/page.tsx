@@ -1,0 +1,157 @@
+import type { Metadata } from "next"
+import { Header } from "@/components/layout/Header"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { User, Bell, Globe, Home, ChevronRight, Palette } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { ColorPicker } from "@/components/settings/ColorPicker"
+import { userProfile } from "@/lib/dummy-data"
+
+export const metadata: Metadata = { title: "Settings" }
+
+export default function SettingsPage() {
+  return (
+    <>
+      <Header title="Settings" />
+      <main className="flex-1 p-4 md:p-6 flex flex-col gap-5 max-w-2xl w-full mx-auto">
+
+        {/* Profile */}
+        <Card className="border-border/60">
+          <CardHeader className="pb-3 pt-5 px-5">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <User className="size-4 text-muted-foreground" />
+              Profile
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-5">
+            <div className="flex items-center gap-4">
+              <Avatar className="size-14">
+                <AvatarFallback className="bg-primary text-primary-foreground text-lg font-semibold">
+                  {userProfile.initials}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="font-semibold text-base">{userProfile.name}</p>
+                <p className="text-sm text-muted-foreground">{userProfile.email}</p>
+                <Badge variant="outline" className="mt-1.5 text-xs">Free plan</Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Appearance */}
+        <Card className="border-border/60">
+          <CardHeader className="pb-3 pt-5 px-5">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Palette className="size-4 text-muted-foreground" />
+              Appearance
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-5">
+            <p className="text-sm font-medium mb-1">Accent color</p>
+            <p className="text-xs text-muted-foreground mb-4">
+              Applies instantly across the entire app
+            </p>
+            <ColorPicker />
+          </CardContent>
+        </Card>
+
+        {/* Preferences */}
+        <Card className="border-border/60">
+          <CardHeader className="pb-3 pt-5 px-5">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Globe className="size-4 text-muted-foreground" />
+              Preferences
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-5">
+            {[
+              { label: "Currency", value: userProfile.currency },
+              { label: "Timezone", value: userProfile.timezone },
+              { label: "Date format", value: "DD/MM/YYYY" },
+              { label: "Language", value: "English" },
+            ].map((pref, i, arr) => (
+              <div key={pref.label}>
+                <div className="flex items-center justify-between py-3">
+                  <p className="text-sm font-medium">{pref.label}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{pref.value}</span>
+                    <ChevronRight className="size-4 text-muted-foreground" />
+                  </div>
+                </div>
+                {i < arr.length - 1 && <Separator />}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Notifications */}
+        <Card className="border-border/60">
+          <CardHeader className="pb-3 pt-5 px-5">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Bell className="size-4 text-muted-foreground" />
+              Notifications
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-5">
+            {(
+              [
+                { key: "budgetAlerts", label: "Budget alerts", description: "Notify when nearing budget limit" },
+                { key: "taskReminders", label: "Task reminders", description: "Reminders for upcoming due dates" },
+                { key: "weeklyReport", label: "Weekly report", description: "Summary of your week every Sunday" },
+              ] as const
+            ).map(({ key, label, description }, i, arr) => (
+              <div key={key}>
+                <div className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-sm font-medium">{label}</p>
+                    <p className="text-xs text-muted-foreground">{description}</p>
+                  </div>
+                  {/* Static toggle — visual only */}
+                  <div className={cn(
+                    "w-10 h-6 rounded-full relative transition-colors",
+                    userProfile.notifications[key] ? "bg-primary" : "bg-muted"
+                  )}>
+                    <div className={cn(
+                      "absolute top-1 size-4 rounded-full bg-white shadow-sm transition-transform",
+                      userProfile.notifications[key] ? "translate-x-5" : "translate-x-1"
+                    )} />
+                  </div>
+                </div>
+                {i < arr.length - 1 && <Separator />}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* About */}
+        <Card className="border-border/60">
+          <CardHeader className="pb-3 pt-5 px-5">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Home className="size-4 text-muted-foreground" />
+              About
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-5">
+            {[
+              { label: "Version", value: "0.1.0" },
+              { label: "Built with", value: "Next.js 16 + Tailwind v4" },
+              { label: "Built by", value: "https://manasconsults.net" },
+            ].map((item, i, arr) => (
+              <div key={item.label}>
+                <div className="flex items-center justify-between py-3">
+                  <p className="text-sm font-medium">{item.label}</p>
+                  <span className="text-sm text-muted-foreground">{item.value}</span>
+                </div>
+                {i < arr.length - 1 && <Separator />}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+      </main>
+    </>
+  )
+}

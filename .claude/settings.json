@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"\nimport sys, json\ndata = json.load(sys.stdin)\nmsg = data.get('message', '').lower()\nfeature_verbs = ['build', 'create', 'implement', 'add', 'develop', 'make']\nfeature_nouns = ['feature', 'page', 'screen', 'flow', 'section', 'modal', 'form', 'calendar', 'notes', 'meal', 'chart', 'dashboard', 'view', 'list', 'tracker']\nhas_verb = any(v in msg for v in feature_verbs)\nhas_noun = any(n in msg for n in feature_nouns)\nif has_verb and has_noun:\n    print(json.dumps({'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit', 'additionalContext': 'WORKFLOW REMINDER: This looks like a feature request. Follow the feature workflow: Plan -> Design -> Build -> Review -> Deploy. Use /feature if not already in the workflow. Do not write any code until Stage 2 (Design) is approved.'}}))\n\""
+          }
+        ]
+      }
+    ]
+  }
+}
