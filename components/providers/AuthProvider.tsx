@@ -8,7 +8,6 @@ import {
   SESSION_MAX_AGE,
   encodeSession,
   decodeSession,
-  findUserByEmail,
 } from "@/lib/dummy-users"
 
 interface AuthContextValue {
@@ -32,10 +31,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const value = match.split("=").slice(1).join("=")
       const payload = decodeSession(value)
       if (payload) {
-        // Backfill role for cookies set before role was introduced
-        if (!payload.role) {
-          payload.role = findUserByEmail(payload.email)?.role ?? "user"
-        }
         setUserState(payload)
       }
     }

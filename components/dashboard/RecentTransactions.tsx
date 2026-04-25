@@ -3,10 +3,12 @@
 import { motion } from "framer-motion"
 import { ArrowUpRight } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-import { transactions } from "@/lib/dummy-data"
+import { cn, formatCurrency } from "@/lib/utils"
+import { useGroup } from "@/components/providers/GroupProvider"
+import { useQueries } from "@tanstack/react-query"
+import { getExpenses, getIncomes } from "@/lib/actions/finance"
+import type { Expense, Income } from "@/lib/dummy-data"
 
 const container = {
   hidden: {},
@@ -19,6 +21,22 @@ const item = {
 }
 
 export function RecentTransactions() {
+  const { activeGroup } = useGroup()
+  const groupId = activeGroup.id
+  const currency = activeGroup.currency
+
+  const [{ data: expenses = [] }, { data: incomes = [] }] = useQueries({
+    queries: [
+      { queryKey: ["expenses", groupId, null], queryFn: () => getExpenses(groupId), staleTime: 60_000 },
+      { queryKey: ["incomes",  groupId, null], queryFn: () => getIncomes(groupId),  staleTime: 60_000 },
+    ],
+  }) as [{ data: Expense[] }, { data: Income[] }]
+
+  const merged = [
+    ...expenses.map((e) => ({ id: e.id, title: e.title, category: e.category, amount: e.amount, type: "expense" as const, date: e.date, icon: e.icon })),
+    ...incomes.map((i)  => ({ id: i.id, title: i.title, category: i.category, amount: i.amount, type: "income"  as const, date: i.date, icon: i.icon })),
+  ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6)
+
   return (
     <Card className="border-border/60">
       <CardHeader className="flex flex-row items-center justify-between pb-2 pt-5 px-5">
@@ -29,7 +47,7 @@ export function RecentTransactions() {
       </CardHeader>
       <CardContent className="px-5 pb-5">
         <motion.ul variants={container} initial="hidden" animate="visible" className="space-y-0">
-          {transactions.slice(0, 6).map((tx) => (
+          {merged.map((tx) => (
             <motion.li
               key={tx.id}
               variants={item}
@@ -43,11 +61,8 @@ export function RecentTransactions() {
                 <p className="text-xs text-muted-foreground">{tx.category}</p>
               </div>
               <div className="text-right shrink-0">
-                <p className={cn(
-                  "text-sm font-semibold",
-                  tx.type === "income" ? "text-success" : "text-foreground"
-                )}>
-                  {tx.type === "income" ? "+" : ""}${Math.abs(tx.amount).toFixed(2)}
+                <p className={cn("text-sm font-semibold", tx.type === "income" ? "text-success" : "text-foreground")}>
+                  {tx.type === "income" ? "+" : ""}{formatCurrency(tx.amount, currency)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {new Date(tx.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}

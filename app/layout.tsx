@@ -4,6 +4,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/providers/ThemeProvider"
 import { ThemeColorProvider } from "@/components/providers/ThemeColorProvider"
 import { AuthProvider } from "@/components/providers/AuthProvider"
+import { ReactQueryProvider } from "@/components/providers/ReactQueryProvider"
 
 const fontSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -24,13 +25,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={fontSans.variable}
     >
       <body className="min-h-screen bg-background antialiased font-sans">
-        <AuthProvider>
-          <ThemeProvider>
-            <ThemeColorProvider>
-              {children}
-            </ThemeColorProvider>
-          </ThemeProvider>
-        </AuthProvider>
+        <ReactQueryProvider>
+          <AuthProvider>
+            <ThemeProvider>
+              <ThemeColorProvider>
+                {children}
+              </ThemeColorProvider>
+            </ThemeProvider>
+          </AuthProvider>
+        </ReactQueryProvider>
       </body>
     </html>
   )

@@ -11,10 +11,14 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useGroup } from "@/components/providers/GroupProvider"
-import {
-  tasks, shoppingItems, notes, calendarEvents,
-  expenses, incomes, userBudgets, loans, recipes,
-} from "@/lib/dummy-data"
+import { useQueries } from "@tanstack/react-query"
+import { getTasks } from "@/lib/actions/tasks"
+import { getShoppingItems } from "@/lib/actions/shopping"
+import { getNotes } from "@/lib/actions/notes"
+import { getCalendarEvents } from "@/lib/actions/calendar"
+import { getBudgets, getExpenses, getIncomes, getLoans } from "@/lib/actions/finance"
+import { getRecipes } from "@/lib/actions/meals"
+import type { Task, ShoppingItem, Note, CalendarEvent, Budget, Expense, Income, Loan, Recipe } from "@/lib/dummy-data"
 
 type ResultType = "task" | "shopping" | "note" | "calendar" | "expense" | "income" | "budget" | "loan" | "recipe"
 
@@ -45,14 +49,27 @@ function match(query: string, ...fields: (string | undefined)[]) {
   return fields.some((f) => f?.toLowerCase().includes(q))
 }
 
-function buildResults(query: string, groupId: string): SearchResult[] {
+function buildResults(
+  query: string,
+  groupId: string,
+  data: {
+    tasks: Task[]
+    shopping: ShoppingItem[]
+    notes: Note[]
+    calendar: CalendarEvent[]
+    expenses: Expense[]
+    incomes: Income[]
+    budgets: Budget[]
+    loans: Loan[]
+    recipes: Recipe[]
+  },
+): SearchResult[] {
   const q = query.trim()
   if (!q) return []
 
   const results: SearchResult[] = []
 
-  // Tasks
-  tasks
+  data.tasks
     .filter((t) => t.groupId === groupId && match(q, t.title, t.category))
     .slice(0, MAX_PER_GROUP)
     .forEach((t) => results.push({
@@ -62,8 +79,7 @@ function buildResults(query: string, groupId: string): SearchResult[] {
       href: "/tasks",
     }))
 
-  // Shopping
-  shoppingItems
+  data.shopping
     .filter((i) => i.groupId === groupId && match(q, i.name, i.store, i.category))
     .slice(0, MAX_PER_GROUP)
     .forEach((i) => results.push({
@@ -73,8 +89,7 @@ function buildResults(query: string, groupId: string): SearchResult[] {
       href: "/shopping",
     }))
 
-  // Notes
-  notes
+  data.notes
     .filter((n) => n.groupId === groupId && match(q, n.title, n.content, n.category))
     .slice(0, MAX_PER_GROUP)
     .forEach((n) => results.push({
@@ -84,8 +99,7 @@ function buildResults(query: string, groupId: string): SearchResult[] {
       href: "/notes",
     }))
 
-  // Calendar
-  calendarEvents
+  data.calendar
     .filter((e) => e.groupId === groupId && match(q, e.title, e.category))
     .slice(0, MAX_PER_GROUP)
     .forEach((e) => results.push({
@@ -95,8 +109,7 @@ function buildResults(query: string, groupId: string): SearchResult[] {
       href: "/calendar",
     }))
 
-  // Expenses
-  expenses
+  data.expenses
     .filter((e) => e.groupId === groupId && match(q, e.title, e.category))
     .slice(0, MAX_PER_GROUP)
     .forEach((e) => results.push({
@@ -106,8 +119,7 @@ function buildResults(query: string, groupId: string): SearchResult[] {
       href: "/finance/expenses",
     }))
 
-  // Income
-  incomes
+  data.incomes
     .filter((i) => i.groupId === groupId && match(q, i.title, i.category))
     .slice(0, MAX_PER_GROUP)
     .forEach((i) => results.push({
@@ -117,8 +129,7 @@ function buildResults(query: string, groupId: string): SearchResult[] {
       href: "/finance/income",
     }))
 
-  // Budgets
-  userBudgets
+  data.budgets
     .filter((b) => b.groupId === groupId && match(q, b.name, b.category))
     .slice(0, MAX_PER_GROUP)
     .forEach((b) => results.push({
@@ -128,8 +139,7 @@ function buildResults(query: string, groupId: string): SearchResult[] {
       href: "/finance/budgets",
     }))
 
-  // Loans
-  loans
+  data.loans
     .filter((l) => l.groupId === groupId && match(q, l.contact, l.notes))
     .slice(0, MAX_PER_GROUP)
     .forEach((l) => results.push({
@@ -139,8 +149,7 @@ function buildResults(query: string, groupId: string): SearchResult[] {
       href: "/finance/loans",
     }))
 
-  // Recipes (not group-scoped)
-  recipes
+  data.recipes
     .filter((r) => match(q, r.name, ...r.tags))
     .slice(0, MAX_PER_GROUP)
     .forEach((r) => results.push({
@@ -153,7 +162,6 @@ function buildResults(query: string, groupId: string): SearchResult[] {
   return results
 }
 
-// Group results by type preserving order of first appearance
 function groupResults(results: SearchResult[]) {
   const order: ResultType[] = []
   const map = new Map<ResultType, SearchResult[]>()
@@ -170,8 +178,35 @@ export function GlobalSearch() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
+  const groupId = activeGroup.id
 
-  const results = buildResults(query, activeGroup.id)
+  const queryResults = useQueries({
+    queries: [
+      { queryKey: ["tasks",         groupId, null], queryFn: () => getTasks(groupId),         enabled: open, staleTime: 30_000 },
+      { queryKey: ["shopping",      groupId, null], queryFn: () => getShoppingItems(groupId), enabled: open, staleTime: 30_000 },
+      { queryKey: ["notes",         groupId, null], queryFn: () => getNotes(groupId),         enabled: open, staleTime: 30_000 },
+      { queryKey: ["calendarEvents",groupId, null], queryFn: () => getCalendarEvents(groupId),enabled: open, staleTime: 30_000 },
+      { queryKey: ["expenses",      groupId, null], queryFn: () => getExpenses(groupId),      enabled: open, staleTime: 30_000 },
+      { queryKey: ["incomes",       groupId, null], queryFn: () => getIncomes(groupId),       enabled: open, staleTime: 30_000 },
+      { queryKey: ["budgets",       groupId, null], queryFn: () => getBudgets(groupId),       enabled: open, staleTime: 30_000 },
+      { queryKey: ["loans",         groupId, null], queryFn: () => getLoans(groupId),         enabled: open, staleTime: 30_000 },
+      { queryKey: ["recipes"],                      queryFn: getRecipes,                      enabled: open, staleTime: 30_000 },
+    ],
+  })
+
+  const searchData = {
+    tasks:    (queryResults[0].data ?? []) as Task[],
+    shopping: (queryResults[1].data ?? []) as ShoppingItem[],
+    notes:    (queryResults[2].data ?? []) as Note[],
+    calendar: (queryResults[3].data ?? []) as CalendarEvent[],
+    expenses: (queryResults[4].data ?? []) as Expense[],
+    incomes:  (queryResults[5].data ?? []) as Income[],
+    budgets:  (queryResults[6].data ?? []) as Budget[],
+    loans:    (queryResults[7].data ?? []) as Loan[],
+    recipes:  (queryResults[8].data ?? []) as Recipe[],
+  }
+
+  const results = buildResults(query, groupId, searchData)
   const grouped = groupResults(results)
 
   const openSearch = useCallback(() => {
@@ -184,7 +219,6 @@ export function GlobalSearch() {
     setQuery("")
   }, [])
 
-  // Cmd+K / Ctrl+K
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -204,7 +238,6 @@ export function GlobalSearch() {
 
   return (
     <>
-      {/* Trigger — desktop: compact bar, mobile: icon */}
       <button
         onClick={openSearch}
         className={cn(
@@ -220,7 +253,6 @@ export function GlobalSearch() {
         </kbd>
       </button>
 
-      {/* Mobile icon */}
       <button
         onClick={openSearch}
         className="md:hidden flex items-center justify-center size-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -229,11 +261,9 @@ export function GlobalSearch() {
         <Search className="size-4" />
       </button>
 
-      {/* Overlay */}
       <AnimatePresence>
         {open && (
           <>
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -243,7 +273,6 @@ export function GlobalSearch() {
               onClick={closeSearch}
             />
 
-            {/* Dialog */}
             <motion.div
               initial={{ opacity: 0, scale: 0.97, y: -8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -253,7 +282,6 @@ export function GlobalSearch() {
             >
               <div className="bg-background rounded-2xl border border-border/60 shadow-[0_24px_64px_rgba(0,0,0,0.18),0_4px_16px_rgba(0,0,0,0.1)] dark:shadow-[0_24px_64px_rgba(0,0,0,0.5),0_4px_16px_rgba(0,0,0,0.3)] overflow-hidden">
 
-                {/* Input row */}
                 <div className="flex items-center gap-3 px-4 h-14 border-b border-border/60">
                   <Search className="size-4 text-muted-foreground shrink-0" />
                   <input
@@ -275,7 +303,6 @@ export function GlobalSearch() {
                   )}
                 </div>
 
-                {/* Results */}
                 <div className="max-h-[60vh] overflow-y-auto">
                   {!query.trim() ? (
                     <p className="text-sm text-muted-foreground text-center py-10">
@@ -292,15 +319,12 @@ export function GlobalSearch() {
                         const Icon = meta.icon
                         return (
                           <div key={type}>
-                            {/* Section label */}
                             <div className="flex items-center gap-2 px-4 py-2">
                               <Icon className={cn("size-3 shrink-0", meta.color)} />
                               <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
                                 {meta.label}
                               </span>
                             </div>
-
-                            {/* Items */}
                             {items.map((result) => (
                               <button
                                 key={result.id}

@@ -6,14 +6,13 @@ import { Plus, X, Calendar, CalendarDays, Clock, Cake } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { calendarEvents, type CalendarEvent } from "@/lib/dummy-data"
+import { type CalendarEvent } from "@/lib/dummy-data"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { CalendarGrid } from "@/components/calendar/CalendarGrid"
 import { UpcomingEvents } from "@/components/calendar/UpcomingEvents"
 import { EventFilter } from "@/components/ui/EventFilter"
-
-const THIS_MONTH = "2026-04"
-const TODAY = "2026-04-07"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { getCalendarEvents, createCalendarEvent, deleteCalendarEvent } from "@/lib/actions/calendar"
 
 const CATEGORIES: CalendarEvent["category"][] = ["appointment", "birthday", "holiday", "reminder", "social"]
 
@@ -35,11 +34,9 @@ const CATEGORY_LABELS: Record<CalendarEvent["category"], string> = {
 
 export function CalendarSection() {
   const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const queryClient = useQueryClient()
 
-  const [eventList, setEventList] = useState<CalendarEvent[]>([])
   const [showForm, setShowForm] = useState(false)
-
-  // Form fields
   const [title, setTitle] = useState("")
   const [date, setDate] = useState("")
   const [category, setCategory] = useState<CalendarEvent["category"]>("appointment")
@@ -47,41 +44,41 @@ export function CalendarSection() {
   const [time, setTime] = useState("09:00")
   const [eventId, setEventId] = useState("")
 
-  // Default date to today — client-side only to avoid hydration mismatch
   useEffect(() => { setDate(new Date().toISOString().slice(0, 10)) }, [])
-
-  // Reset list when scope changes
-  useEffect(() => {
-    const next = activeEvent
-      ? calendarEvents.filter((e) => e.eventId === activeEvent.id)
-      : calendarEvents.filter((e) => e.groupId === activeGroup.id)
-    setEventList(next)
-  }, [activeGroup.id, activeEvent?.id])
-
-  // Sync eventId with activeEvent
   useEffect(() => { setEventId(activeEvent?.id ?? "") }, [activeEvent?.id])
+
+  const { data: eventList = [] } = useQuery({
+    queryKey: ["calendar", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: () => getCalendarEvents(activeGroup.id, activeEvent?.id),
+  })
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["calendar", activeGroup.id] })
+
+  const createMutation = useMutation({ mutationFn: createCalendarEvent, onSuccess: invalidate })
+  const deleteMutation = useMutation({ mutationFn: deleteCalendarEvent, onSuccess: invalidate })
 
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 
-  const thisMonth = eventList.filter((e) => e.date.startsWith(THIS_MONTH)).length
-  const today = eventList.filter((e) => e.date === TODAY).length
+  const thisMonth = new Date().toISOString().slice(0, 7)
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const thisMonthCount = eventList.filter((e) => e.date.startsWith(thisMonth)).length
+  const todayCount = eventList.filter((e) => e.date === todayStr).length
   const appointments = eventList.filter((e) => e.category === "appointment").length
   const birthdays = eventList.filter((e) => e.category === "birthday").length
 
   const statsData = [
-    { label: "This Month", value: thisMonth, icon: Calendar, color: "text-primary", bg: "bg-primary/10" },
-    { label: "Today", value: today, icon: CalendarDays, color: "text-success", bg: "bg-success/10" },
+    { label: "This Month", value: thisMonthCount, icon: Calendar, color: "text-primary", bg: "bg-primary/10" },
+    { label: "Today", value: todayCount, icon: CalendarDays, color: "text-success", bg: "bg-success/10" },
     { label: "Appointments", value: appointments, icon: Clock, color: "text-warning", bg: "bg-warning/10" },
     { label: "Birthdays", value: birthdays, icon: Cake, color: "text-destructive", bg: "bg-destructive/10" },
   ]
 
-  function handleAdd(e: React.FormEvent) {
+  async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim() || !date) return
 
-    const now = new Date().toISOString().slice(0, 10)
-    const newEvent: CalendarEvent = {
-      id: `cal-${Date.now()}`,
+    const result = await createMutation.mutateAsync({
       title: title.trim(),
       date,
       ...(!allDay && time ? { time } : {}),
@@ -90,18 +87,17 @@ export function CalendarSection() {
       icon: CATEGORY_ICONS[category],
       groupId: activeGroup.id,
       ...(eventId ? { eventId } : {}),
-      createdAt: now,
-      updatedAt: now,
-    }
+    })
 
-    setEventList((prev) => [newEvent, ...prev])
-    setTitle("")
-    setDate(new Date().toISOString().slice(0, 10))
-    setCategory("appointment")
-    setAllDay(true)
-    setTime("09:00")
-    setEventId(activeEvent?.id ?? "")
-    setShowForm(false)
+    if (result.success) {
+      setTitle("")
+      setDate(new Date().toISOString().slice(0, 10))
+      setCategory("appointment")
+      setAllDay(true)
+      setTime("09:00")
+      setEventId(activeEvent?.id ?? "")
+      setShowForm(false)
+    }
   }
 
   return (
@@ -159,7 +155,6 @@ export function CalendarSection() {
             >
               <div className="p-4 flex flex-col gap-3 border-b border-border/60">
 
-                {/* Title */}
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-muted-foreground font-medium">Title</label>
                   <input
@@ -172,7 +167,6 @@ export function CalendarSection() {
                   />
                 </div>
 
-                {/* Date + Category */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
                     <label className="text-xs text-muted-foreground font-medium">Date</label>
@@ -198,7 +192,6 @@ export function CalendarSection() {
                   </div>
                 </div>
 
-                {/* All-day toggle + time */}
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
@@ -237,7 +230,6 @@ export function CalendarSection() {
                   </AnimatePresence>
                 </div>
 
-                {/* Event (optional) */}
                 {groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
                     <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
@@ -254,7 +246,12 @@ export function CalendarSection() {
                   </div>
                 )}
 
-                <Button type="submit" size="sm" className="self-end">
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="self-end"
+                  disabled={createMutation.isPending}
+                >
                   Add event
                 </Button>
               </div>

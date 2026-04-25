@@ -2,10 +2,42 @@
 
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { monthlyTrend } from "@/lib/dummy-data"
+import { useGroup } from "@/components/providers/GroupProvider"
+import { useQueries } from "@tanstack/react-query"
+import { getExpenses, getIncomes } from "@/lib/actions/finance"
+import type { Expense, Income } from "@/lib/dummy-data"
+
+const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+
+function last6Months(): { key: string; label: string }[] {
+  const result = []
+  const now = new Date()
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    result.push({ key: d.toISOString().slice(0, 7), label: MONTH_ABBR[d.getMonth()] })
+  }
+  return result
+}
 
 export function MonthlyTrend() {
-  const maxVal = Math.max(...monthlyTrend.flatMap((m) => [m.income, m.expenses]))
+  const { activeGroup } = useGroup()
+  const groupId = activeGroup.id
+
+  const [{ data: expenses = [] }, { data: incomes = [] }] = useQueries({
+    queries: [
+      { queryKey: ["expenses", groupId, null], queryFn: () => getExpenses(groupId), staleTime: 60_000 },
+      { queryKey: ["incomes",  groupId, null], queryFn: () => getIncomes(groupId),  staleTime: 60_000 },
+    ],
+  }) as [{ data: Expense[] }, { data: Income[] }]
+
+  const months = last6Months()
+  const monthlyTrend = months.map(({ key, label }) => ({
+    month: label,
+    income:   incomes.filter((i) => i.date.startsWith(key)).reduce((s, i) => s + i.amount, 0),
+    expenses: expenses.filter((e) => e.date.startsWith(key)).reduce((s, e) => s + e.amount, 0),
+  }))
+
+  const maxVal = Math.max(...monthlyTrend.flatMap((m) => [m.income, m.expenses]), 1)
 
   return (
     <Card className="border-border/60">
@@ -25,14 +57,12 @@ export function MonthlyTrend() {
           {monthlyTrend.map((month, i) => (
             <div key={month.month} className="flex-1 flex flex-col items-center gap-1">
               <div className="w-full flex items-end gap-0.5 h-24">
-                {/* Income bar */}
                 <motion.div
                   className="flex-1 rounded-t-sm bg-primary/80"
                   initial={{ height: 0 }}
                   animate={{ height: `${(month.income / maxVal) * 100}%` }}
                   transition={{ duration: 0.5, delay: i * 0.07, ease: "easeOut" }}
                 />
-                {/* Expenses bar */}
                 <motion.div
                   className="flex-1 rounded-t-sm bg-destructive/60"
                   initial={{ height: 0 }}

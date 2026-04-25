@@ -2,24 +2,23 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AppLogoMark } from "@/components/ui/AppLogo"
-import { useAuth } from "@/components/providers/AuthProvider"
-import { findUserByEmail, registerUser, type DummyUser } from "@/lib/dummy-users"
+import { Clock } from "lucide-react"
+import { registerAction } from "@/lib/actions/auth"
 
 export default function RegisterPage() {
-  const { setUser } = useAuth()
-  const router = useRouter()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
   const [error, setError] = useState("")
+  const [submitted, setSubmitted] = useState(false)
+  const [loading, setLoading] = useState(false)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError("")
 
@@ -31,22 +30,44 @@ export default function RegisterPage() {
       setError("Passwords don't match.")
       return
     }
-    if (findUserByEmail(email)) {
-      setError("An account with this email already exists.")
+
+    setLoading(true)
+    const result = await registerAction({ name, email, password })
+    setLoading(false)
+
+    if (!result.success) {
+      setError(result.error)
       return
     }
+    setSubmitted(true)
+  }
 
-    const newUser: DummyUser = {
-      id: `user-${Date.now()}`,
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      password,
-      role: "user",
-      createdAt: new Date().toISOString().slice(0, 10),
-    }
-    registerUser(newUser)
-    setUser({ userId: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role })
-    router.push("/")
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="w-full max-w-sm flex flex-col items-center gap-6 text-center"
+        >
+          <div className="size-16 rounded-2xl bg-warning/10 flex items-center justify-center">
+            <Clock className="size-8 text-warning" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <h1 className="text-xl font-bold tracking-tight">Request submitted</h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Your account is pending admin approval.
+              <br />
+              You&apos;ll be able to sign in once an admin approves your request.
+            </p>
+          </div>
+          <Link href="/login" className="text-sm text-primary hover:underline font-medium">
+            Back to sign in
+          </Link>
+        </motion.div>
+      </div>
+    )
   }
 
   return (
@@ -135,8 +156,8 @@ export default function RegisterPage() {
                 )}
               </AnimatePresence>
 
-              <Button type="submit" className="w-full mt-1">
-                Create account
+              <Button type="submit" className="w-full mt-1" disabled={loading}>
+                {loading ? "Creating account…" : "Create account"}
               </Button>
             </form>
           </CardContent>

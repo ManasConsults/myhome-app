@@ -6,7 +6,7 @@ A multi-user, multi-household home management app. Features: finance tracking, t
 
 ## Current Phase
 
-UI-first with dummy data. All data lives in `lib/dummy-data.ts`. Database (Drizzle/Vercel Postgres) and real Auth.js v5 are planned but not wired up yet — **do not add them unless explicitly asked**.
+UI-first with dummy data. All data lives in `lib/dummy-data.ts`. Database (Prisma/local Postgres) schema is defined — **do not wire up real data unless explicitly asked**. Real Auth.js v5 is planned but not wired up yet.
 
 Core UI pages exist for all features. Groups are implemented — all data types carry a `groupId` and the active group is managed by `GroupProvider`. Finance is feature-complete: budgets (with edit/delete), expense tracking, income (recurring + one-off), and loan tracking (lend/borrow, repayment history, interest). Global search is implemented in the header. Dummy auth is implemented (login/register/sign-out with cookie session). Active development: UI polish and future backend wiring.
 
@@ -50,7 +50,7 @@ All data types carry `createdAt: string` and `updatedAt: string` (YYYY-MM-DD).
 | Motion | Framer Motion |
 | Forms | React Hook Form + Zod |
 | Client state | TanStack Query + React Context |
-| Database | Vercel Postgres (Neon) + Drizzle ORM |
+| Database | PostgreSQL + Prisma ORM |
 | Auth | Auth.js v5 (NextAuth) |
 | Email | Resend + React Email |
 | Storage | Vercel Blob |
@@ -349,7 +349,8 @@ lib/
   theme-colors.ts       # Color preset definitions + applyThemeColor()
   utils.ts              # cn() and shared utilities
   validations/          # Zod schemas (shared between forms + server actions)
-  db/schema/            # Drizzle schemas (when database phase begins)
+  db/
+    prisma.ts           # Prisma client singleton
 proxy.ts                # Route protection (Next.js 16 — replaces middleware.ts)
 ```
 
@@ -531,7 +532,7 @@ type SearchResult = {
 
 Notes are freeform text entries within a group, optionally attached to an event.
 
-**`Note` type** (canonical, lives in `lib/dummy-data.ts` now, Drizzle schema later):
+**`Note` type** (canonical, lives in `lib/dummy-data.ts` now, Prisma schema later):
 
 ```ts
 type Note = {
@@ -579,7 +580,7 @@ default → `bg-card border-border/60` · blue → `bg-primary/5 border-primary/
 
 Calendar events are scheduled items within a group, optionally attached to an event.
 
-**`CalendarEvent` type** (canonical, lives in `lib/dummy-data.ts` now, Drizzle schema later):
+**`CalendarEvent` type** (canonical, lives in `lib/dummy-data.ts` now, Prisma schema later):
 
 ```ts
 type CalendarEvent = {
@@ -621,7 +622,7 @@ appointment → `bg-primary` · reminder → `bg-warning` · birthday/holiday �
 
 Shopping items are grouped by store in the list view. Each item can optionally be attached to an event.
 
-**`ShoppingItem` type** (canonical, lives in `lib/dummy-data.ts` now, Drizzle schema later):
+**`ShoppingItem` type** (canonical, lives in `lib/dummy-data.ts` now, Prisma schema later):
 
 ```ts
 type ShoppingItem = {
@@ -675,7 +676,7 @@ Produce → 🥦 · Dairy → 🥛 · Meat → 🥩 · Bakery → 🍞 · Frozen
 
 Tasks are action items within a group, optionally attached to an event.
 
-**`Task` type** (canonical, lives in `lib/dummy-data.ts` now, Drizzle schema later):
+**`Task` type** (canonical, lives in `lib/dummy-data.ts` now, Prisma schema later):
 
 ```ts
 type Task = {
@@ -725,7 +726,7 @@ Chores → 🧹 · Bills → 💳 · Shopping → 🛒 · Maintenance → 🔧 �
 
 Budgets are the core of the finance feature. A budget sets a spending (or income) limit for a category over a defined period.
 
-**`Budget` type** (canonical, lives in `lib/dummy-data.ts` now, Drizzle schema later):
+**`Budget` type** (canonical, lives in `lib/dummy-data.ts` now, Prisma schema later):
 
 ```ts
 type Budget = {
@@ -774,7 +775,7 @@ Food & Dining · Utilities · Entertainment · Health & Fitness · Shopping · T
 
 Expenses are individual spending entries logged by the user. They may be one-off or recurring.
 
-**`Expense` type** (canonical, lives in `lib/dummy-data.ts` now, Drizzle schema later):
+**`Expense` type** (canonical, lives in `lib/dummy-data.ts` now, Prisma schema later):
 
 ```ts
 type Expense = {
@@ -828,7 +829,7 @@ type Expense = {
 
 Income entries record money coming in. They may be recurring (salary, rental) or one-off (freelance, bonus).
 
-**`Income` type** (canonical, lives in `lib/dummy-data.ts` now, Drizzle schema later):
+**`Income` type** (canonical, lives in `lib/dummy-data.ts` now, Prisma schema later):
 
 ```ts
 type Income = {
@@ -877,7 +878,7 @@ Salary · Freelance · Rental Income · Investment · Business Income · Governm
 
 Loans track money lent to others and money borrowed from others, with optional interest and repayment history.
 
-**`Loan` type** (canonical, lives in `lib/dummy-data.ts` now, Drizzle schema later):
+**`Loan` type** (canonical, lives in `lib/dummy-data.ts` now, Prisma schema later):
 
 ```ts
 type Loan = {
@@ -963,7 +964,7 @@ const outstanding = Math.max(0, loan.principal + interest - totalRepaid)
 
 The meal plan is a slot-based weekly grid. Each day (Mon–Sun) has three slots: breakfast, lunch, dinner — each holds a recipe ID (or `""` for empty).
 
-**`DayMeals` type** (canonical, lives in `lib/dummy-data.ts` now, Drizzle schema later):
+**`DayMeals` type** (canonical, lives in `lib/dummy-data.ts` now, Prisma schema later):
 
 ```ts
 type DayMeals = {
@@ -1047,7 +1048,7 @@ type Recipe = {
 
 Groups are **households** — permanent locations a user manages (home in Brisbane, home in India, parents' house, etc.). Every data type carries `groupId: string`.
 
-**`Group` type** (canonical, lives in `lib/dummy-data.ts` now, Drizzle schema later):
+**`Group` type** (canonical, lives in `lib/dummy-data.ts` now, Prisma schema later):
 
 ```ts
 type Group = {
@@ -1081,7 +1082,7 @@ type Group = {
 
 Events are **time-bound activities** (trips, weddings, renovations, etc.) that belong to a parent group. Event-scoped data is tracked separately from the household's regular data.
 
-**`Event` type** (canonical, lives in `lib/dummy-data.ts` now, Drizzle schema later):
+**`Event` type** (canonical, lives in `lib/dummy-data.ts` now, Prisma schema later):
 
 ```ts
 type AppEvent = {
@@ -1135,5 +1136,6 @@ All data types (`Budget`, `Expense`, `Income`, `Task`, `ShoppingItem`, `Note`, `
 - TypeScript strict mode — no `any`, no implicit types
 - Check `package.json` before introducing any new library
 - Zod schemas in `lib/validations/` — shared between forms and server actions
-- Drizzle schemas in `lib/db/schema/`
+- Prisma schema in `prisma/schema.prisma`
+- Prisma client singleton in `lib/db/prisma.ts` — always import from here, never instantiate `PrismaClient` directly
 - Reference patterns in `docs/patterns/`

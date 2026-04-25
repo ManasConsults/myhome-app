@@ -6,11 +6,13 @@ import { Plus, X, UtensilsCrossed, BookOpen, Clock, Flame } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { weeklyMealPlan, recipes, type DayMeals, type Recipe } from "@/lib/dummy-data"
+import { type DayMeals, type Recipe } from "@/lib/dummy-data"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { WeeklyPlanGrid } from "@/components/meals/WeeklyPlanGrid"
 import { RecipeList } from "@/components/meals/RecipeList"
 import { EventFilter } from "@/components/ui/EventFilter"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { getRecipes, createRecipe, updateRecipe, deleteRecipe, getMealPlan, upsertDayMeals, deleteDayMeals } from "@/lib/actions/meals"
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 type MealKey = "breakfast" | "lunch" | "dinner"
@@ -23,33 +25,50 @@ const MEAL_LABELS: Record<MealKey, string> = {
 
 export function MealsSection() {
   const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const queryClient = useQueryClient()
 
   const formCardRef = useRef<HTMLDivElement>(null)
-  const [planData, setPlanData] = useState<DayMeals[]>([])
-  const [recipeList, setRecipeList] = useState<Recipe[]>(recipes)
   const [showForm, setShowForm] = useState(false)
   const [editingSlot, setEditingSlot] = useState<{ day: string; mealKey: MealKey } | null>(null)
 
-  // Form fields
   const [day, setDay] = useState("Mon")
   const [mealKey, setMealKey] = useState<MealKey>("breakfast")
-  const [recipeId, setRecipeId] = useState(recipeList[0]?.id ?? "")
+  const [recipeId, setRecipeId] = useState("")
   const [eventId, setEventId] = useState("")
 
-  // Reset plan when scope changes
-  useEffect(() => {
-    const next = activeEvent
-      ? weeklyMealPlan.filter((d) => d.eventId === activeEvent.id)
-      : weeklyMealPlan.filter((d) => d.groupId === activeGroup.id)
-    setPlanData(next)
-  }, [activeGroup.id, activeEvent?.id])
-
-  // Sync eventId with activeEvent
   useEffect(() => { setEventId(activeEvent?.id ?? "") }, [activeEvent?.id])
+
+  const groupId = activeGroup.id
+  const activeEventId = activeEvent?.id ?? null
+
+  const { data: recipeList = [] } = useQuery<Recipe[]>({
+    queryKey: ["recipes"],
+    queryFn: getRecipes,
+  })
+
+  const { data: planList = [] } = useQuery<DayMeals[]>({
+    queryKey: ["mealPlan", groupId, activeEventId],
+    queryFn: () => getMealPlan(groupId, activeEvent?.id),
+  })
+
+  const invalidatePlan = () => queryClient.invalidateQueries({ queryKey: ["mealPlan", groupId] })
+  const invalidateRecipes = () => queryClient.invalidateQueries({ queryKey: ["recipes"] })
+
+  const upsertMutation = useMutation({ mutationFn: upsertDayMeals, onSuccess: invalidatePlan })
+  const deleteDayMutation = useMutation({
+    mutationFn: ({ day, eventId }: { day: string; eventId?: string }) => deleteDayMeals(groupId, day, eventId),
+    onSuccess: invalidatePlan,
+  })
+  const createRecipeMutation = useMutation({ mutationFn: createRecipe, onSuccess: invalidateRecipes })
+  const updateRecipeMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateRecipe>[1] }) => updateRecipe(id, data),
+    onSuccess: invalidateRecipes,
+  })
+  const deleteRecipeMutation = useMutation({ mutationFn: deleteRecipe, onSuccess: invalidateRecipes })
 
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 
-  const mealsPlanned = planData.reduce((count, d) =>
+  const mealsPlanned = planList.reduce((count, d) =>
     count + (d.breakfast ? 1 : 0) + (d.lunch ? 1 : 0) + (d.dinner ? 1 : 0), 0)
 
   const recipeCount = recipeList.length
@@ -74,33 +93,40 @@ export function MealsSection() {
     setEventId(activeEvent?.id ?? "")
   }
 
-  function handleRecipeSave(recipe: Recipe) {
-    setRecipeList((prev) => {
-      const idx = prev.findIndex((r) => r.id === recipe.id)
-      if (idx !== -1) {
-        const updated = [...prev]
-        updated[idx] = recipe
-        return updated
-      }
-      return [...prev, recipe]
-    })
+  async function handleRecipeSave(recipe: Recipe) {
+    const isNew = !recipeList.find((r) => r.id === recipe.id)
+    const data = {
+      name: recipe.name,
+      mealType: recipe.mealType,
+      prepTime: recipe.prepTime,
+      calories: recipe.calories,
+      servings: recipe.servings,
+      tags: recipe.tags,
+      icon: recipe.icon,
+    }
+    if (isNew) {
+      await createRecipeMutation.mutateAsync(data)
+    } else {
+      await updateRecipeMutation.mutateAsync({ id: recipe.id, data })
+    }
   }
 
-  function handleRecipeDelete(id: string) {
-    setRecipeList((prev) => prev.filter((r) => r.id !== id))
-    // Clear deleted recipe from any planned meal slots
-    setPlanData((prev) =>
-      prev.reduce<DayMeals[]>((acc, d) => {
-        const updated = {
-          ...d,
-          breakfast: d.breakfast === id ? "" : d.breakfast,
-          lunch: d.lunch === id ? "" : d.lunch,
-          dinner: d.dinner === id ? "" : d.dinner,
-        }
-        if (!updated.breakfast && !updated.lunch && !updated.dinner) return acc
-        return [...acc, updated]
-      }, [])
-    )
+  async function handleRecipeDelete(id: string) {
+    await deleteRecipeMutation.mutateAsync(id)
+    // Clear deleted recipe from plan slots
+    const affected = planList.filter((d) => d.breakfast === id || d.lunch === id || d.dinner === id)
+    await Promise.all(affected.map((d) => {
+      const updated = {
+        ...d,
+        breakfast: d.breakfast === id ? "" : d.breakfast,
+        lunch: d.lunch === id ? "" : d.lunch,
+        dinner: d.dinner === id ? "" : d.dinner,
+      }
+      if (!updated.breakfast && !updated.lunch && !updated.dinner) {
+        return deleteDayMutation.mutateAsync({ day: d.day, eventId: d.eventId })
+      }
+      return upsertMutation.mutateAsync(updated)
+    }))
   }
 
   function openCreate() {
@@ -109,12 +135,12 @@ export function MealsSection() {
     setShowForm(true)
   }
 
-  function openEdit(day: string, mealKey: MealKey, recipeId: string) {
-    setEditingSlot({ day, mealKey })
-    setDay(day)
-    setMealKey(mealKey)
-    setRecipeId(recipeId)
-    const existing = planData.find((d) => d.day === day)
+  function openEdit(slotDay: string, slotMealKey: MealKey, slotRecipeId: string) {
+    setEditingSlot({ day: slotDay, mealKey: slotMealKey })
+    setDay(slotDay)
+    setMealKey(slotMealKey)
+    setRecipeId(slotRecipeId)
+    const existing = planList.find((d) => d.day === slotDay)
     setEventId(existing?.eventId ?? activeEvent?.id ?? "")
     setShowForm(true)
     setTimeout(() => {
@@ -128,47 +154,35 @@ export function MealsSection() {
     resetForm()
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (!recipeId) return
 
-    const today = new Date().toISOString().slice(0, 10)
-    setPlanData((prev) => {
-      const existingIdx = prev.findIndex((d) => d.day === day)
-      if (existingIdx !== -1) {
-        const updated = [...prev]
-        updated[existingIdx] = { ...updated[existingIdx], [mealKey]: recipeId, updatedAt: today }
-        return updated
-      }
-      const newEntry: DayMeals = {
-        day,
-        breakfast: "",
-        lunch: "",
-        dinner: "",
-        groupId: activeGroup.id,
-        createdAt: today,
-        updatedAt: today,
-        ...(eventId ? { eventId } : {}),
-        [mealKey]: recipeId,
-      }
-      const insertIdx = prev.findIndex((d) => DAYS.indexOf(d.day) > DAYS.indexOf(day))
-      if (insertIdx === -1) return [...prev, newEntry]
-      return [...prev.slice(0, insertIdx), newEntry, ...prev.slice(insertIdx)]
-    })
+    const existing = planList.find((d) => d.day === day)
+    const payload: Omit<DayMeals, "createdAt" | "updatedAt"> = {
+      day,
+      breakfast: existing?.breakfast ?? "",
+      lunch: existing?.lunch ?? "",
+      dinner: existing?.dinner ?? "",
+      groupId: activeGroup.id,
+      ...(eventId ? { eventId } : {}),
+      [mealKey]: recipeId,
+    }
 
-    closeForm()
+    const result = await upsertMutation.mutateAsync(payload)
+    if (result.success) closeForm()
   }
 
-  function handleDelete(day: string, mealKey: MealKey) {
-    setPlanData((prev) =>
-      prev.reduce<DayMeals[]>((acc, d) => {
-        if (d.day !== day) return [...acc, d]
-        const updated = { ...d, [mealKey]: "" }
-        // Drop the day entry if all slots are now empty
-        if (!updated.breakfast && !updated.lunch && !updated.dinner) return acc
-        return [...acc, updated]
-      }, [])
-    )
+  async function handleDelete(slotDay: string, slotMealKey: MealKey) {
+    const existing = planList.find((d) => d.day === slotDay)
+    if (!existing) return
+
+    const updated = { ...existing, [slotMealKey]: "" }
+    if (!updated.breakfast && !updated.lunch && !updated.dinner) {
+      await deleteDayMutation.mutateAsync({ day: slotDay, eventId: existing.eventId })
+    } else {
+      await upsertMutation.mutateAsync(updated)
+    }
   }
 
   return (
@@ -227,7 +241,6 @@ export function MealsSection() {
               <div className="p-4 flex flex-col gap-3 border-b border-border/60">
                 <p className="text-sm font-medium">{editingSlot ? "Edit meal" : "New meal"}</p>
 
-                {/* Day + Meal slot */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
                     <label className="text-xs text-muted-foreground font-medium">Day</label>
@@ -251,7 +264,6 @@ export function MealsSection() {
                   </div>
                 </div>
 
-                {/* Recipe */}
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-muted-foreground font-medium">Recipe</label>
                   <select
@@ -259,13 +271,13 @@ export function MealsSection() {
                     onChange={(e) => setRecipeId(e.target.value)}
                     className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                   >
+                    <option value="">Select a recipe</option>
                     {recipeList.map((r) => (
                       <option key={r.id} value={r.id}>{r.icon} {r.name}</option>
                     ))}
                   </select>
                 </div>
 
-                {/* Event (optional) */}
                 {groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
                     <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
@@ -284,7 +296,7 @@ export function MealsSection() {
 
                 <div className="flex items-center gap-2 justify-end">
                   <Button type="button" variant="ghost" size="sm" onClick={closeForm}>Cancel</Button>
-                  <Button type="submit" size="sm">
+                  <Button type="submit" size="sm" disabled={upsertMutation.isPending}>
                     {editingSlot ? "Save changes" : "Add meal"}
                   </Button>
                 </div>
@@ -296,7 +308,7 @@ export function MealsSection() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5">
         <div className="lg:col-span-2">
-          <WeeklyPlanGrid data={planData} onEdit={openEdit} onDelete={handleDelete} />
+          <WeeklyPlanGrid data={planList} onEdit={openEdit} onDelete={handleDelete} />
         </div>
         <div>
           <RecipeList data={recipeList} onSave={handleRecipeSave} onDelete={handleRecipeDelete} />

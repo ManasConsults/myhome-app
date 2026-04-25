@@ -6,12 +6,12 @@ import { Plus, X, CheckCircle2, Circle, AlertCircle, ListTodo } from "lucide-rea
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { tasks as initialTasks, type Task } from "@/lib/dummy-data"
+import { type Task } from "@/lib/dummy-data"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { TaskList } from "@/components/dashboard/TaskList"
 import { EventFilter } from "@/components/ui/EventFilter"
-
-const TODAY = "2026-04-07"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { getTasks, createTask, updateTask, deleteTask } from "@/lib/actions/tasks"
 
 const CATEGORY_ICONS: Record<string, string> = {
   Chores: "🧹",
@@ -28,13 +28,12 @@ const CATEGORIES = ["Chores", "Bills", "Shopping", "Maintenance", "Health", "Per
 
 export function TasksSection() {
   const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const queryClient = useQueryClient()
 
   const formCardRef = useRef<HTMLDivElement>(null)
-  const [taskList, setTaskList] = useState<Task[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
-  // Form state
   const [title, setTitle] = useState("")
   const [category, setCategory] = useState("Chores")
   const [priority, setPriority] = useState<"high" | "medium" | "low">("medium")
@@ -42,22 +41,31 @@ export function TasksSection() {
   const [eventId, setEventId] = useState("")
 
   useEffect(() => { setDue(new Date().toISOString().slice(0, 10)) }, [])
-
-  useEffect(() => {
-    const next = activeEvent
-      ? initialTasks.filter((t) => t.eventId === activeEvent.id)
-      : initialTasks.filter((t) => t.groupId === activeGroup.id)
-    setTaskList(next)
-  }, [activeGroup.id, activeEvent?.id])
-
   useEffect(() => { setEventId(activeEvent?.id ?? "") }, [activeEvent?.id])
+
+  const { data: taskList = [] } = useQuery({
+    queryKey: ["tasks", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: () => getTasks(activeGroup.id, activeEvent?.id),
+  })
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["tasks", activeGroup.id] })
+
+  const createMutation = useMutation({ mutationFn: createTask, onSuccess: invalidate })
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Task, "id" | "createdAt" | "updatedAt">> }) =>
+      updateTask(id, data),
+    onSuccess: invalidate,
+  })
+  const deleteMutation = useMutation({ mutationFn: deleteTask, onSuccess: invalidate })
 
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 
+  const today = new Date().toISOString().slice(0, 10)
   const total = taskList.length
   const done = taskList.filter((t) => t.done).length
   const pending = taskList.filter((t) => !t.done).length
-  const overdue = taskList.filter((t) => !t.done && t.due < TODAY).length
+  const overdue = taskList.filter((t) => !t.done && t.due < today).length
 
   const statsData = [
     { label: "Total", value: total, icon: ListTodo, color: "text-primary", bg: "bg-primary/10" },
@@ -99,31 +107,25 @@ export function TasksSection() {
     resetForm()
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
 
     if (editingId) {
-      setTaskList((prev) =>
-        prev.map((t) =>
-          t.id === editingId
-            ? {
-                ...t,
-                title: title.trim(),
-                category,
-                priority,
-                due,
-                icon: CATEGORY_ICONS[category] ?? "📌",
-                ...(eventId ? { eventId } : { eventId: undefined }),
-                updatedAt: new Date().toISOString().slice(0, 10),
-              }
-            : t
-        )
-      )
+      const result = await updateMutation.mutateAsync({
+        id: editingId,
+        data: {
+          title: title.trim(),
+          category,
+          priority,
+          due,
+          icon: CATEGORY_ICONS[category] ?? "📌",
+          ...(eventId ? { eventId } : { eventId: undefined }),
+        },
+      })
+      if (result.success) closeForm()
     } else {
-      const now = new Date().toISOString().slice(0, 10)
-      const newTask: Task = {
-        id: `task-${Date.now()}`,
+      const result = await createMutation.mutateAsync({
         title: title.trim(),
         category,
         priority,
@@ -132,17 +134,13 @@ export function TasksSection() {
         icon: CATEGORY_ICONS[category] ?? "📌",
         groupId: activeGroup.id,
         ...(eventId ? { eventId } : {}),
-        createdAt: now,
-        updatedAt: now,
-      }
-      setTaskList((prev) => [newTask, ...prev])
+      })
+      if (result.success) closeForm()
     }
-
-    closeForm()
   }
 
-  function handleDelete(id: string) {
-    setTaskList((prev) => prev.filter((t) => t.id !== id))
+  async function handleDelete(id: string) {
+    await deleteMutation.mutateAsync(id)
   }
 
   return (
@@ -200,7 +198,6 @@ export function TasksSection() {
             >
               <div className="p-4 flex flex-col gap-3 border-b border-border/60">
                 <p className="text-sm font-medium">{editingId ? "Edit task" : "New task"}</p>
-                {/* Title */}
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-muted-foreground font-medium">Title</label>
                   <input
@@ -213,7 +210,6 @@ export function TasksSection() {
                   />
                 </div>
 
-                {/* Category + Priority */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
                     <label className="text-xs text-muted-foreground font-medium">Category</label>
@@ -239,7 +235,6 @@ export function TasksSection() {
                   </div>
                 </div>
 
-                {/* Due date */}
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-muted-foreground font-medium">Due date</label>
                   <input
@@ -251,7 +246,6 @@ export function TasksSection() {
                   />
                 </div>
 
-                {/* Event (optional, only shown when group has events) */}
                 {groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
                     <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
@@ -270,7 +264,11 @@ export function TasksSection() {
 
                 <div className="flex items-center gap-2 justify-end">
                   <Button type="button" variant="ghost" size="sm" onClick={closeForm}>Cancel</Button>
-                  <Button type="submit" size="sm">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={createMutation.isPending || updateMutation.isPending}
+                  >
                     {editingId ? "Save changes" : "Add task"}
                   </Button>
                 </div>

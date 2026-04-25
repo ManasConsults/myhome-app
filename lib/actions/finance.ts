@@ -1,0 +1,388 @@
+"use server"
+
+import { prisma } from "@/lib/db/prisma"
+import { toDateStr } from "@/lib/utils"
+import type { Budget, Expense, Income, Loan, LoanRepayment } from "@/lib/dummy-data"
+
+// ─── Budget ─────────────────────────────────────────────────────────────────
+
+function serializeBudget(b: Awaited<ReturnType<typeof prisma.budget.findFirst>>): Budget {
+  if (!b) throw new Error("Budget not found")
+  return {
+    id: b.id,
+    name: b.name,
+    type: b.type as Budget["type"],
+    category: b.category,
+    icon: b.icon,
+    color: b.color,
+    amount: b.amount,
+    spent: b.spent,
+    startDate: toDateStr(b.startDate),
+    period: b.period,
+    groupId: b.groupId,
+    eventId: b.eventId ?? undefined,
+    createdAt: toDateStr(b.createdAt),
+    updatedAt: toDateStr(b.updatedAt),
+  }
+}
+
+export async function getBudgets(groupId: string, eventId?: string): Promise<Budget[]> {
+  const items = await prisma.budget.findMany({
+    where: eventId ? { eventId } : { groupId },
+    orderBy: { updatedAt: "desc" },
+  })
+  return items.map(serializeBudget)
+}
+
+export async function createBudget(
+  data: Omit<Budget, "id" | "createdAt" | "updatedAt">,
+): Promise<{ success: true; data: Budget } | { success: false; error: string }> {
+  try {
+    const b = await prisma.budget.create({
+      data: {
+        name: data.name,
+        type: data.type,
+        category: data.category,
+        icon: data.icon,
+        color: data.color,
+        amount: data.amount,
+        spent: data.spent,
+        startDate: new Date(data.startDate),
+        period: data.period,
+        groupId: data.groupId,
+        eventId: data.eventId ?? null,
+      },
+    })
+    return { success: true, data: serializeBudget(b) }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
+export async function updateBudget(
+  id: string,
+  data: Partial<Omit<Budget, "id" | "createdAt" | "updatedAt">>,
+): Promise<{ success: true; data: Budget } | { success: false; error: string }> {
+  try {
+    const b = await prisma.budget.update({
+      where: { id },
+      data: {
+        ...data,
+        startDate: data.startDate ? new Date(data.startDate) : undefined,
+        eventId: data.eventId ?? null,
+      },
+    })
+    return { success: true, data: serializeBudget(b) }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
+export async function deleteBudget(id: string): Promise<{ success: boolean }> {
+  try {
+    await prisma.budget.delete({ where: { id } })
+    return { success: true }
+  } catch { return { success: false } }
+}
+
+// ─── Expense ─────────────────────────────────────────────────────────────────
+
+function serializeExpense(e: Awaited<ReturnType<typeof prisma.expense.findFirst>>): Expense {
+  if (!e) throw new Error("Expense not found")
+  return {
+    id: e.id,
+    title: e.title,
+    amount: e.amount,
+    category: e.category,
+    icon: e.icon,
+    date: toDateStr(e.date),
+    recurring: e.recurring,
+    frequency: e.frequency as Expense["frequency"] ?? undefined,
+    nextDate: e.nextDate ? toDateStr(e.nextDate) : undefined,
+    budgetId: e.budgetId ?? undefined,
+    groupId: e.groupId,
+    eventId: e.eventId ?? undefined,
+    createdAt: toDateStr(e.createdAt),
+    updatedAt: toDateStr(e.updatedAt),
+  }
+}
+
+export async function getExpenses(groupId: string, eventId?: string): Promise<Expense[]> {
+  const items = await prisma.expense.findMany({
+    where: eventId ? { eventId } : { groupId },
+    orderBy: { date: "desc" },
+  })
+  return items.map(serializeExpense)
+}
+
+export async function createExpense(
+  data: Omit<Expense, "id" | "createdAt" | "updatedAt">,
+): Promise<{ success: true; data: Expense } | { success: false; error: string }> {
+  try {
+    const e = await prisma.expense.create({
+      data: {
+        title: data.title,
+        amount: data.amount,
+        category: data.category,
+        icon: data.icon,
+        date: new Date(data.date),
+        recurring: data.recurring,
+        frequency: data.frequency ?? null,
+        nextDate: data.nextDate ? new Date(data.nextDate) : null,
+        budgetId: data.budgetId ?? null,
+        groupId: data.groupId,
+        eventId: data.eventId ?? null,
+      },
+    })
+    return { success: true, data: serializeExpense(e) }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
+export async function updateExpense(
+  id: string,
+  data: Partial<Omit<Expense, "id" | "createdAt" | "updatedAt">>,
+): Promise<{ success: true; data: Expense } | { success: false; error: string }> {
+  try {
+    const e = await prisma.expense.update({
+      where: { id },
+      data: {
+        ...data,
+        date: data.date ? new Date(data.date) : undefined,
+        nextDate: data.nextDate ? new Date(data.nextDate) : data.nextDate === null ? null : undefined,
+        frequency: data.frequency ?? null,
+        budgetId: data.budgetId ?? null,
+        eventId: data.eventId ?? null,
+      },
+    })
+    return { success: true, data: serializeExpense(e) }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
+export async function deleteExpense(id: string): Promise<{ success: boolean }> {
+  try {
+    await prisma.expense.delete({ where: { id } })
+    return { success: true }
+  } catch { return { success: false } }
+}
+
+// ─── Income ──────────────────────────────────────────────────────────────────
+
+function serializeIncome(i: Awaited<ReturnType<typeof prisma.income.findFirst>>): Income {
+  if (!i) throw new Error("Income not found")
+  return {
+    id: i.id,
+    title: i.title,
+    amount: i.amount,
+    category: i.category,
+    icon: i.icon,
+    date: toDateStr(i.date),
+    recurring: i.recurring,
+    frequency: i.frequency as Income["frequency"] ?? undefined,
+    nextDate: i.nextDate ? toDateStr(i.nextDate) : undefined,
+    groupId: i.groupId,
+    eventId: i.eventId ?? undefined,
+    createdAt: toDateStr(i.createdAt),
+    updatedAt: toDateStr(i.updatedAt),
+  }
+}
+
+export async function getIncomes(groupId: string, eventId?: string): Promise<Income[]> {
+  const items = await prisma.income.findMany({
+    where: eventId ? { eventId } : { groupId },
+    orderBy: { date: "desc" },
+  })
+  return items.map(serializeIncome)
+}
+
+export async function createIncome(
+  data: Omit<Income, "id" | "createdAt" | "updatedAt">,
+): Promise<{ success: true; data: Income } | { success: false; error: string }> {
+  try {
+    const i = await prisma.income.create({
+      data: {
+        title: data.title,
+        amount: data.amount,
+        category: data.category,
+        icon: data.icon,
+        date: new Date(data.date),
+        recurring: data.recurring,
+        frequency: data.frequency ?? null,
+        nextDate: data.nextDate ? new Date(data.nextDate) : null,
+        groupId: data.groupId,
+        eventId: data.eventId ?? null,
+      },
+    })
+    return { success: true, data: serializeIncome(i) }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
+export async function updateIncome(
+  id: string,
+  data: Partial<Omit<Income, "id" | "createdAt" | "updatedAt">>,
+): Promise<{ success: true; data: Income } | { success: false; error: string }> {
+  try {
+    const i = await prisma.income.update({
+      where: { id },
+      data: {
+        ...data,
+        date: data.date ? new Date(data.date) : undefined,
+        nextDate: data.nextDate ? new Date(data.nextDate) : data.nextDate === null ? null : undefined,
+        frequency: data.frequency ?? null,
+        eventId: data.eventId ?? null,
+      },
+    })
+    return { success: true, data: serializeIncome(i) }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
+export async function deleteIncome(id: string): Promise<{ success: boolean }> {
+  try {
+    await prisma.income.delete({ where: { id } })
+    return { success: true }
+  } catch { return { success: false } }
+}
+
+// ─── Loan ────────────────────────────────────────────────────────────────────
+
+function serializeLoan(l: Awaited<ReturnType<typeof prisma.loan.findFirst>>): Loan {
+  if (!l) throw new Error("Loan not found")
+  return {
+    id: l.id,
+    direction: l.direction as Loan["direction"],
+    contact: l.contact,
+    principal: l.principal,
+    interestRate: l.interestRate,
+    startDate: toDateStr(l.startDate),
+    dueDate: l.dueDate ? toDateStr(l.dueDate) : undefined,
+    notes: l.notes ?? undefined,
+    groupId: l.groupId,
+    eventId: l.eventId ?? undefined,
+    createdAt: toDateStr(l.createdAt),
+    updatedAt: toDateStr(l.updatedAt),
+  }
+}
+
+export async function getLoans(groupId: string, eventId?: string): Promise<Loan[]> {
+  const items = await prisma.loan.findMany({
+    where: eventId ? { eventId } : { groupId },
+    orderBy: { startDate: "desc" },
+  })
+  return items.map(serializeLoan)
+}
+
+export async function createLoan(
+  data: Omit<Loan, "id" | "createdAt" | "updatedAt">,
+): Promise<{ success: true; data: Loan } | { success: false; error: string }> {
+  try {
+    const l = await prisma.loan.create({
+      data: {
+        direction: data.direction,
+        contact: data.contact,
+        principal: data.principal,
+        interestRate: data.interestRate,
+        startDate: new Date(data.startDate),
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        notes: data.notes ?? null,
+        groupId: data.groupId,
+        eventId: data.eventId ?? null,
+      },
+    })
+    return { success: true, data: serializeLoan(l) }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
+export async function updateLoan(
+  id: string,
+  data: Partial<Omit<Loan, "id" | "createdAt" | "updatedAt">>,
+): Promise<{ success: true; data: Loan } | { success: false; error: string }> {
+  try {
+    const l = await prisma.loan.update({
+      where: { id },
+      data: {
+        ...data,
+        startDate: data.startDate ? new Date(data.startDate) : undefined,
+        dueDate: data.dueDate ? new Date(data.dueDate) : data.dueDate === null ? null : undefined,
+        notes: data.notes ?? null,
+        eventId: data.eventId ?? null,
+      },
+    })
+    return { success: true, data: serializeLoan(l) }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
+export async function deleteLoan(id: string): Promise<{ success: boolean }> {
+  try {
+    await prisma.loan.delete({ where: { id } })
+    return { success: true }
+  } catch { return { success: false } }
+}
+
+// ─── LoanRepayment ───────────────────────────────────────────────────────────
+
+function serializeRepayment(r: Awaited<ReturnType<typeof prisma.loanRepayment.findFirst>>): LoanRepayment {
+  if (!r) throw new Error("LoanRepayment not found")
+  return {
+    id: r.id,
+    loanId: r.loanId,
+    amount: r.amount,
+    date: toDateStr(r.date),
+    note: r.note ?? undefined,
+    createdAt: toDateStr(r.createdAt),
+    updatedAt: toDateStr(r.updatedAt),
+  }
+}
+
+export async function getRepayments(loanId: string): Promise<LoanRepayment[]> {
+  const items = await prisma.loanRepayment.findMany({
+    where: { loanId },
+    orderBy: { date: "asc" },
+  })
+  return items.map(serializeRepayment)
+}
+
+export async function getRepaymentsByGroup(groupId: string): Promise<LoanRepayment[]> {
+  const loans = await prisma.loan.findMany({ where: { groupId }, select: { id: true } })
+  const loanIds = loans.map((l) => l.id)
+  const items = await prisma.loanRepayment.findMany({
+    where: { loanId: { in: loanIds } },
+    orderBy: { date: "asc" },
+  })
+  return items.map(serializeRepayment)
+}
+
+export async function createRepayment(
+  data: Omit<LoanRepayment, "id" | "createdAt" | "updatedAt">,
+): Promise<{ success: true; data: LoanRepayment } | { success: false; error: string }> {
+  try {
+    const r = await prisma.loanRepayment.create({
+      data: {
+        loanId: data.loanId,
+        amount: data.amount,
+        date: new Date(data.date),
+        note: data.note ?? null,
+      },
+    })
+    return { success: true, data: serializeRepayment(r) }
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+}
+
+export async function deleteRepayment(id: string): Promise<{ success: boolean }> {
+  try {
+    await prisma.loanRepayment.delete({ where: { id } })
+    return { success: true }
+  } catch { return { success: false } }
+}

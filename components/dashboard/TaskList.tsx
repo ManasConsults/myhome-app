@@ -7,7 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
-import { tasks, type Task } from "@/lib/dummy-data"
+import { type Task } from "@/lib/dummy-data"
+import { useGroup } from "@/components/providers/GroupProvider"
+import { useQuery } from "@tanstack/react-query"
+import { getTasks } from "@/lib/actions/tasks"
 
 type Filter = "all" | "pending" | "done"
 type SortKey = "updatedAt" | "createdAt" | "due" | "priority"
@@ -40,7 +43,13 @@ interface TaskListProps {
 }
 
 export function TaskList({ data, onEdit, onDelete }: TaskListProps) {
-  const source = data ?? tasks
+  const { activeGroup } = useGroup()
+  const { data: fetchedTasks = [] } = useQuery<Task[]>({
+    queryKey: ["tasks", activeGroup.id, null],
+    queryFn: () => getTasks(activeGroup.id),
+    enabled: !data,
+  })
+  const source = data ?? fetchedTasks
   const [filter, setFilter] = useState<Filter>("all")
   const [sortBy, setSortBy] = useState<SortKey>("updatedAt")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")

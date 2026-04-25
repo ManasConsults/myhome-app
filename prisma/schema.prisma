@@ -1,0 +1,250 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String?
+  role      String   @default("user")
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  groups    Group[]
+}
+
+model Group {
+  id            String         @id @default(cuid())
+  name          String
+  type          String         @default("household")
+  currency      String         @default("USD")
+  description   String?
+  location      String?
+  color         String
+  icon          String
+  isDefault     Boolean        @default(false)
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  events        AppEvent[]
+  budgets       Budget[]
+  expenses      Expense[]
+  incomes       Income[]
+  loans         Loan[]
+  tasks         Task[]
+  shoppingItems ShoppingItem[]
+  notes         Note[]
+  calendarEvents CalendarEvent[]
+  dayMeals      DayMeals[]
+}
+
+model AppEvent {
+  id            String         @id @default(cuid())
+  groupId       String
+  group         Group          @relation(fields: [groupId], references: [id])
+  name          String
+  description   String?
+  icon          String
+  color         String
+  startDate     DateTime
+  endDate       DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  budgets       Budget[]
+  expenses      Expense[]
+  incomes       Income[]
+  loans         Loan[]
+  tasks         Task[]
+  shoppingItems ShoppingItem[]
+  notes         Note[]
+  calendarEvents CalendarEvent[]
+  dayMeals      DayMeals[]
+}
+
+model Budget {
+  id        String    @id @default(cuid())
+  name      String
+  type      String
+  category  String
+  icon      String
+  color     String
+  amount    Float
+  spent     Float     @default(0)
+  startDate DateTime
+  period    String
+  groupId   String
+  group     Group     @relation(fields: [groupId], references: [id])
+  eventId   String?
+  event     AppEvent? @relation(fields: [eventId], references: [id])
+  expenses  Expense[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Expense {
+  id        String    @id @default(cuid())
+  title     String
+  amount    Float
+  category  String
+  icon      String
+  date      DateTime
+  recurring Boolean   @default(false)
+  frequency String?
+  nextDate  DateTime?
+  groupId   String
+  group     Group     @relation(fields: [groupId], references: [id])
+  eventId   String?
+  event     AppEvent? @relation(fields: [eventId], references: [id])
+  budgetId  String?
+  budget    Budget?   @relation(fields: [budgetId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Income {
+  id        String    @id @default(cuid())
+  title     String
+  amount    Float
+  category  String
+  icon      String
+  date      DateTime
+  recurring Boolean   @default(false)
+  frequency String?
+  nextDate  DateTime?
+  groupId   String
+  group     Group     @relation(fields: [groupId], references: [id])
+  eventId   String?
+  event     AppEvent? @relation(fields: [eventId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Loan {
+  id           String          @id @default(cuid())
+  direction    String
+  contact      String
+  principal    Float
+  interestRate Float           @default(0)
+  startDate    DateTime
+  dueDate      DateTime?
+  notes        String?
+  groupId      String
+  group        Group           @relation(fields: [groupId], references: [id])
+  eventId      String?
+  event        AppEvent?       @relation(fields: [eventId], references: [id])
+  repayments   LoanRepayment[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model LoanRepayment {
+  id        String   @id @default(cuid())
+  loanId    String
+  loan      Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  amount    Float
+  date      DateTime
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Task {
+  id        String    @id @default(cuid())
+  title     String
+  category  String
+  priority  String
+  done      Boolean   @default(false)
+  due       DateTime
+  icon      String
+  groupId   String
+  group     Group     @relation(fields: [groupId], references: [id])
+  eventId   String?
+  event     AppEvent? @relation(fields: [eventId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model ShoppingItem {
+  id             String    @id @default(cuid())
+  name           String
+  category       String
+  quantity       Float
+  unit           String
+  estimatedPrice Float     @default(0)
+  checked        Boolean   @default(false)
+  store          String
+  icon           String
+  groupId        String
+  group          Group     @relation(fields: [groupId], references: [id])
+  eventId        String?
+  event          AppEvent? @relation(fields: [eventId], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Note {
+  id        String    @id @default(cuid())
+  title     String
+  content   String
+  category  String
+  pinned    Boolean   @default(false)
+  color     String    @default("default")
+  groupId   String
+  group     Group     @relation(fields: [groupId], references: [id])
+  eventId   String?
+  event     AppEvent? @relation(fields: [eventId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model CalendarEvent {
+  id        String    @id @default(cuid())
+  title     String
+  date      DateTime
+  time      String?
+  category  String
+  allDay    Boolean   @default(true)
+  icon      String
+  groupId   String
+  group     Group     @relation(fields: [groupId], references: [id])
+  eventId   String?
+  event     AppEvent? @relation(fields: [eventId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Recipe {
+  id        String   @id @default(cuid())
+  name      String
+  mealType  String
+  prepTime  Int
+  calories  Int
+  servings  Int
+  tags      String[]
+  icon      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// breakfast/lunch/dinner store recipe IDs (empty string = unset slot)
+model DayMeals {
+  id        String    @id @default(cuid())
+  day       String
+  breakfast String    @default("")
+  lunch     String    @default("")
+  dinner    String    @default("")
+  groupId   String
+  group     Group     @relation(fields: [groupId], references: [id])
+  eventId   String?
+  event     AppEvent? @relation(fields: [eventId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([groupId, eventId, day])
+}

@@ -7,7 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
-import { shoppingItems, type ShoppingItem } from "@/lib/dummy-data"
+import { type ShoppingItem } from "@/lib/dummy-data"
+import { useGroup } from "@/components/providers/GroupProvider"
+import { useQuery } from "@tanstack/react-query"
+import { getShoppingItems } from "@/lib/actions/shopping"
 
 type SortKey = "updatedAt" | "createdAt" | "price" | "name"
 
@@ -25,7 +28,13 @@ interface ShoppingListProps {
 }
 
 export function ShoppingList({ data, onEdit, onDelete }: ShoppingListProps) {
-  const source = data ?? shoppingItems
+  const { activeGroup } = useGroup()
+  const { data: fetchedItems = [] } = useQuery<ShoppingItem[]>({
+    queryKey: ["shopping", activeGroup.id, null],
+    queryFn: () => getShoppingItems(activeGroup.id),
+    enabled: !data,
+  })
+  const source = data ?? fetchedItems
   const [sortBy, setSortBy] = useState<SortKey>("updatedAt")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
   const [checked, setChecked] = useState<Set<string>>(

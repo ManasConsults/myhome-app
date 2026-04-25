@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AppLogoMark } from "@/components/ui/AppLogo"
 import { useAuth } from "@/components/providers/AuthProvider"
-import { findUser } from "@/lib/dummy-users"
+import { loginAction } from "@/lib/actions/auth"
 
 export default function LoginPage() {
   const { setUser } = useAuth()
@@ -16,18 +16,22 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError("")
+    setLoading(true)
 
-    const user = findUser(email, password)
-    if (!user) {
-      setError("Invalid email or password.")
+    const result = await loginAction(email, password)
+    setLoading(false)
+
+    if (!result.success) {
+      setError(result.error)
       return
     }
 
-    setUser({ userId: user.id, name: user.name, email: user.email, role: user.role })
+    setUser(result.user)
     router.push("/")
   }
 
@@ -91,8 +95,8 @@ export default function LoginPage() {
                 )}
               </AnimatePresence>
 
-              <Button type="submit" className="w-full mt-1">
-                Sign in
+              <Button type="submit" className="w-full mt-1" disabled={loading}>
+                {loading ? "Signing in…" : "Sign in"}
               </Button>
             </form>
           </CardContent>

@@ -6,9 +6,11 @@ import { Plus, X, RefreshCw, Calendar, Pencil, Trash2, ArrowUp, ArrowDown } from
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { incomes as initialIncomes, type Income } from "@/lib/dummy-data"
+import { type Income } from "@/lib/dummy-data"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { EventFilter } from "@/components/ui/EventFilter"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { getIncomes, createIncome, updateIncome, deleteIncome } from "@/lib/actions/finance"
 
 type Tab = "all" | "recurring" | "one-off"
 type Frequency = "weekly" | "fortnightly" | "monthly" | "yearly"
@@ -90,24 +92,29 @@ const itemVariants = {
 
 export function IncomeList() {
   const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const queryClient = useQueryClient()
   const currency = activeGroup.currency
   const formCardRef = useRef<HTMLDivElement>(null)
   const [tab, setTab] = useState<Tab>("all")
   const [sortBy, setSortBy] = useState<SortKey>("updatedAt")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
-  const [incomes, setIncomes] = useState<Income[]>(() =>
-    initialIncomes.filter((i) => i.groupId === "g1")
-  )
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  useEffect(() => {
-    const next = activeEvent
-      ? initialIncomes.filter((i) => i.eventId === activeEvent.id)
-      : initialIncomes.filter((i) => i.groupId === activeGroup.id)
-    setIncomes(next)
-  }, [activeGroup.id, activeEvent?.id])
+  const { data: incomes = [] } = useQuery({
+    queryKey: ["incomes", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: () => getIncomes(activeGroup.id, activeEvent?.id),
+  })
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["incomes", activeGroup.id] })
+  const createMutation = useMutation({ mutationFn: createIncome, onSuccess: invalidate })
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Income, "id" | "createdAt" | "updatedAt">> }) =>
+      updateIncome(id, data),
+    onSuccess: invalidate,
+  })
+  const deleteMutation = useMutation({ mutationFn: deleteIncome, onSuccess: invalidate })
 
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 
@@ -177,58 +184,39 @@ export function IncomeList() {
     resetForm()
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     const parsed = parseFloat(amount)
     if (!title.trim() || isNaN(parsed) || parsed <= 0) return
 
-    if (editingId) {
-      setIncomes((prev) =>
-        prev.map((inc) =>
-          inc.id === editingId
-            ? {
-                ...inc,
-                title: title.trim(),
-                amount: parsed,
-                category,
-                icon: CATEGORY_ICONS[category] ?? "💰",
-                date,
-                recurring,
-                ...(eventId ? { eventId } : { eventId: undefined }),
-                ...(recurring
-                  ? { frequency, nextDate: computeNextDate(date, frequency) }
-                  : { frequency: undefined, nextDate: undefined }),
-                updatedAt: new Date().toISOString().slice(0, 10),
-              }
-            : inc
-        )
-      )
-    } else {
-      const now = new Date().toISOString().slice(0, 10)
-      const newIncome: Income = {
-        id: `i${Date.now()}`,
-        title: title.trim(),
-        amount: parsed,
-        category,
-        icon: CATEGORY_ICONS[category] ?? "💰",
-        date,
-        recurring,
-        groupId: activeGroup.id,
-        ...(eventId ? { eventId } : {}),
-        ...(recurring
-          ? { frequency, nextDate: computeNextDate(date, frequency) }
-          : {}),
-        createdAt: now,
-        updatedAt: now,
-      }
-      setIncomes((prev) => [newIncome, ...prev])
+    const shared = {
+      title: title.trim(),
+      amount: parsed,
+      category,
+      icon: CATEGORY_ICONS[category] ?? "💰",
+      date,
+      recurring,
+      ...(eventId ? { eventId } : { eventId: undefined }),
+      ...(recurring
+        ? { frequency, nextDate: computeNextDate(date, frequency) }
+        : { frequency: undefined, nextDate: undefined }),
     }
 
-    closeForm()
+    if (editingId) {
+      const result = await updateMutation.mutateAsync({ id: editingId, data: shared })
+      if (result.success) closeForm()
+    } else {
+      const result = await createMutation.mutateAsync({
+        ...shared,
+        groupId: activeGroup.id,
+        ...(recurring ? {} : { frequency: undefined, nextDate: undefined }),
+      })
+      if (result.success) closeForm()
+    }
   }
 
-  function handleDelete(id: string) {
-    setIncomes((prev) => prev.filter((inc) => inc.id !== id))
+  async function handleDelete(id: string) {
+    await deleteMutation.mutateAsync(id)
     setDeleteId(null)
   }
 

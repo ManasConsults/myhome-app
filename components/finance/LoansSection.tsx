@@ -6,35 +6,35 @@ import { Plus, X, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2 } from "
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { loans as initialLoans, loanRepayments as initialRepayments, type Loan, type LoanRepayment } from "@/lib/dummy-data"
+import { type Loan, type LoanRepayment } from "@/lib/dummy-data"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { LoanList } from "@/components/finance/LoanList"
 import { EventFilter } from "@/components/ui/EventFilter"
-
-const TODAY = "2026-04-07"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { getLoans, createLoan, updateLoan, deleteLoan, getRepaymentsByGroup, createRepayment } from "@/lib/actions/finance"
 
 function calcOutstanding(loan: Loan, repayments: LoanRepayment[]) {
-  const days = Math.max(0, (new Date(TODAY).getTime() - new Date(loan.startDate).getTime()) / 86_400_000)
+  const today = new Date().toISOString().slice(0, 10)
+  const days = Math.max(0, (new Date(today).getTime() - new Date(loan.startDate).getTime()) / 86_400_000)
   const interest = loan.principal * (loan.interestRate / 100) * (days / 365)
   const totalRepaid = repayments.filter((r) => r.loanId === loan.id).reduce((s, r) => s + r.amount, 0)
   return Math.max(0, loan.principal + interest - totalRepaid)
 }
 
 function isOverdue(loan: Loan, outstanding: number) {
-  return outstanding > 0 && !!loan.dueDate && loan.dueDate < TODAY
+  const today = new Date().toISOString().slice(0, 10)
+  return outstanding > 0 && !!loan.dueDate && loan.dueDate < today
 }
 
 export function LoansSection() {
   const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const queryClient = useQueryClient()
   const currency = activeGroup.currency
 
   const formCardRef = useRef<HTMLDivElement>(null)
-  const [loanList, setLoanList] = useState<Loan[]>([])
-  const [repayments, setRepayments] = useState<LoanRepayment[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
-  // Form fields
   const [direction, setDirection] = useState<"lent" | "borrowed">("lent")
   const [contact, setContact] = useState("")
   const [principal, setPrincipal] = useState("")
@@ -45,18 +45,32 @@ export function LoansSection() {
   const [eventId, setEventId] = useState("")
 
   useEffect(() => { setStartDate(new Date().toISOString().slice(0, 10)) }, [])
-
-  // Reset on scope change
-  useEffect(() => {
-    const nextLoans = activeEvent
-      ? initialLoans.filter((l) => l.eventId === activeEvent.id)
-      : initialLoans.filter((l) => l.groupId === activeGroup.id)
-    setLoanList(nextLoans)
-    const ids = new Set(nextLoans.map((l) => l.id))
-    setRepayments(initialRepayments.filter((r) => ids.has(r.loanId)))
-  }, [activeGroup.id, activeEvent?.id])
-
   useEffect(() => { setEventId(activeEvent?.id ?? "") }, [activeEvent?.id])
+
+  const { data: loanList = [] } = useQuery({
+    queryKey: ["loans", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: () => getLoans(activeGroup.id, activeEvent?.id),
+  })
+
+  const { data: repayments = [] } = useQuery({
+    queryKey: ["repayments", activeGroup.id],
+    queryFn: () => getRepaymentsByGroup(activeGroup.id),
+  })
+
+  const invalidateLoans = () => queryClient.invalidateQueries({ queryKey: ["loans", activeGroup.id] })
+  const invalidateRepayments = () => queryClient.invalidateQueries({ queryKey: ["repayments", activeGroup.id] })
+
+  const createMutation = useMutation({ mutationFn: createLoan, onSuccess: invalidateLoans })
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Loan, "id" | "createdAt" | "updatedAt">> }) =>
+      updateLoan(id, data),
+    onSuccess: invalidateLoans,
+  })
+  const deleteMutation = useMutation({
+    mutationFn: deleteLoan,
+    onSuccess: () => { invalidateLoans(); invalidateRepayments() },
+  })
+  const repaymentMutation = useMutation({ mutationFn: createRepayment, onSuccess: invalidateRepayments })
 
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 
@@ -119,61 +133,38 @@ export function LoansSection() {
     resetForm()
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     const amount = parseFloat(principal)
     const rate = parseFloat(interestRate)
     if (!contact.trim() || !amount || amount <= 0 || !startDate) return
 
-    if (editingId) {
-      setLoanList((prev) =>
-        prev.map((l) =>
-          l.id === editingId
-            ? {
-                ...l,
-                direction,
-                contact: contact.trim(),
-                principal: amount,
-                interestRate: isNaN(rate) ? 0 : Math.max(0, rate),
-                startDate,
-                ...(dueDate ? { dueDate } : { dueDate: undefined }),
-                ...(notes.trim() ? { notes: notes.trim() } : { notes: undefined }),
-                ...(eventId ? { eventId } : { eventId: undefined }),
-                updatedAt: new Date().toISOString().slice(0, 10),
-              }
-            : l
-        )
-      )
-    } else {
-      const now = new Date().toISOString().slice(0, 10)
-      const newLoan: Loan = {
-        id: `loan-${Date.now()}`,
-        direction,
-        contact: contact.trim(),
-        principal: amount,
-        interestRate: isNaN(rate) ? 0 : Math.max(0, rate),
-        startDate,
-        ...(dueDate ? { dueDate } : {}),
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
-        groupId: activeGroup.id,
-        ...(eventId ? { eventId } : {}),
-        createdAt: now,
-        updatedAt: now,
-      }
-      setLoanList((prev) => [newLoan, ...prev])
+    const shared = {
+      direction,
+      contact: contact.trim(),
+      principal: amount,
+      interestRate: isNaN(rate) ? 0 : Math.max(0, rate),
+      startDate,
+      ...(dueDate ? { dueDate } : { dueDate: undefined }),
+      ...(notes.trim() ? { notes: notes.trim() } : { notes: undefined }),
+      ...(eventId ? { eventId } : { eventId: undefined }),
     }
 
-    closeForm()
+    if (editingId) {
+      const result = await updateMutation.mutateAsync({ id: editingId, data: shared })
+      if (result.success) closeForm()
+    } else {
+      const result = await createMutation.mutateAsync({ ...shared, groupId: activeGroup.id })
+      if (result.success) closeForm()
+    }
   }
 
-  function handleDelete(id: string) {
-    setLoanList((prev) => prev.filter((l) => l.id !== id))
-    setRepayments((prev) => prev.filter((r) => r.loanId !== id))
+  async function handleDelete(id: string) {
+    await deleteMutation.mutateAsync(id)
   }
 
-  function handleAddRepayment(rep: Omit<LoanRepayment, "id" | "createdAt" | "updatedAt">) {
-    const now = new Date().toISOString().slice(0, 10)
-    setRepayments((prev) => [...prev, { ...rep, id: `rep-${Date.now()}`, createdAt: now, updatedAt: now }])
+  async function handleAddRepayment(rep: Omit<LoanRepayment, "id" | "createdAt" | "updatedAt">) {
+    await repaymentMutation.mutateAsync(rep)
   }
 
   return (

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { recipes as defaultRecipes, type Recipe } from "@/lib/dummy-data"
+import { type Recipe } from "@/lib/dummy-data"
 import { cn } from "@/lib/utils"
 
 type SortKey = "name" | "prepTime" | "calories"
@@ -38,7 +38,7 @@ interface RecipeListProps {
 
 export function RecipeList({ data, onSave, onDelete }: RecipeListProps) {
   const formCardRef = useRef<HTMLDivElement>(null)
-  const source = data ?? defaultRecipes
+  const source = data ?? []
 
   const [sortBy, setSortBy] = useState<SortKey>("name")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")

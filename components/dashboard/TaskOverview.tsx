@@ -7,7 +7,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
-import { tasks } from "@/lib/dummy-data"
+import { useGroup } from "@/components/providers/GroupProvider"
+import { useQuery } from "@tanstack/react-query"
+import { getTasks } from "@/lib/actions/tasks"
+import type { Task } from "@/lib/dummy-data"
 
 const priorityStyles = {
   high: "bg-destructive/10 text-destructive",
@@ -26,9 +29,16 @@ const item = {
 }
 
 export function TaskOverview() {
+  const { activeGroup } = useGroup()
+
+  const { data: tasks = [] } = useQuery<Task[]>({
+    queryKey: ["tasks", activeGroup.id, null],
+    queryFn: () => getTasks(activeGroup.id),
+  })
+
   const completed = tasks.filter((t) => t.done).length
   const total = tasks.length
-  const progress = Math.round((completed / total) * 100)
+  const progress = total > 0 ? Math.round((completed / total) * 100) : 0
 
   return (
     <Card className="border-border/60">
