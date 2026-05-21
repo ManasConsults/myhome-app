@@ -6,7 +6,7 @@ import { Plus, X, UtensilsCrossed, BookOpen, Clock, Flame } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { type DayMeals, type Recipe } from "@/lib/dummy-data"
+import { type DayMeals, type Recipe } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { WeeklyPlanGrid } from "@/components/meals/WeeklyPlanGrid"
 import { RecipeList } from "@/components/meals/RecipeList"
@@ -308,7 +308,7 @@ export function MealsSection() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5">
         <div className="lg:col-span-2">
-          <WeeklyPlanGrid data={planList} onEdit={openEdit} onDelete={handleDelete} />
+          <WeeklyPlanGrid data={planList} recipes={recipeList} onEdit={openEdit} onDelete={handleDelete} />
         </div>
         <div>
           <RecipeList data={recipeList} onSave={handleRecipeSave} onDelete={handleRecipeDelete} />

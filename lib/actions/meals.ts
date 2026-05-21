@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
-import type { Recipe, DayMeals } from "@/lib/dummy-data"
+import type { Recipe, DayMeals } from "@/lib/types"
 
 // ─── Recipe ──────────────────────────────────────────────────────────────────
 

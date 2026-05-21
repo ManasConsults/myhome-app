@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
-import type { AppEvent } from "@/lib/dummy-data"
+import type { AppEvent } from "@/lib/types"
 
 function serialize(e: Awaited<ReturnType<typeof prisma.appEvent.findFirst>>): AppEvent {
   if (!e) throw new Error("Event not found")

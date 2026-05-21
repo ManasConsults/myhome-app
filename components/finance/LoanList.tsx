@@ -6,9 +6,9 @@ import { ChevronDown, Plus, X, User, Pencil, Trash2, ArrowUp, ArrowDown } from "
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { type Loan, type LoanRepayment } from "@/lib/dummy-data"
+import { type Loan, type LoanRepayment } from "@/lib/types"
 
-const TODAY = "2026-04-07"
+const TODAY = new Date().toISOString().slice(0, 10)
 
 type Tab = "all" | "lent" | "borrowed"
 type LoanStatus = "active" | "settled" | "overdue"

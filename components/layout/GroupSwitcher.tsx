@@ -5,7 +5,7 @@ import { ChevronDown, Check, Plus } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { useGroup } from "@/components/providers/GroupProvider"
-import type { Group } from "@/lib/dummy-data"
+import type { Group } from "@/lib/types"
 
 const COLOR_MAP: Record<Group["color"], { bg: string; text: string; dot: string }> = {
   primary:     { bg: "bg-primary/10",     text: "text-primary",     dot: "bg-primary" },

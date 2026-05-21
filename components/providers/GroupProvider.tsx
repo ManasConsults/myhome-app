@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useAuth } from "@/components/providers/AuthProvider"
 import { getGroups } from "@/lib/actions/groups"
 import { getEventsByUser } from "@/lib/actions/events"
-import type { Group, AppEvent } from "@/lib/dummy-data"
+import type { Group, AppEvent } from "@/lib/types"
 
 type GroupContextValue = {
   groups: Group[]

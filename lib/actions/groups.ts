@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
-import type { Group } from "@/lib/dummy-data"
+import type { Group } from "@/lib/types"
 
 function serialize(g: Awaited<ReturnType<typeof prisma.group.findFirst>>): Group {
   if (!g) throw new Error("Group not found")

@@ -8,7 +8,7 @@ import {
   SESSION_MAX_AGE,
   encodeSession,
   decodeSession,
-} from "@/lib/dummy-users"
+} from "@/lib/session"
 
 interface AuthContextValue {
   user: SessionPayload | null

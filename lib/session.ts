@@ -1,7 +1,3 @@
-// Session utilities — used by proxy.ts and AuthProvider.
-// All user CRUD is in lib/actions/auth.ts (Prisma-backed).
-// Plain-text passwords are intentional for the UI-phase only.
-
 export type UserRole = "admin" | "manager" | "user"
 export type UserStatus = "pending" | "active" | "rejected"
 
@@ -26,8 +22,6 @@ export function decodeSession(value: string): SessionPayload | null {
     return null
   }
 }
-
-// ─── App-wide settings (localStorage-backed — not yet in DB) ─────────────────
 
 export type AppSettings = {
   defaultCurrency: string

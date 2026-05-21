@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
-import type { Task } from "@/lib/dummy-data"
+import type { Task } from "@/lib/types"
 
 function serialize(t: Awaited<ReturnType<typeof prisma.task.findFirst>>): Task {
   if (!t) throw new Error("Task not found")

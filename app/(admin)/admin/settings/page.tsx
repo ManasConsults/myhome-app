@@ -11,7 +11,7 @@ import {
   saveAppSettings,
   DEFAULT_APP_SETTINGS,
   type AppSettings,
-} from "@/lib/dummy-users"
+} from "@/lib/session"
 import { THEME_COLORS } from "@/lib/theme-colors"
 
 const CURRENCIES = ["AUD", "USD", "EUR", "GBP", "CAD", "NZD", "SGD", "INR"]

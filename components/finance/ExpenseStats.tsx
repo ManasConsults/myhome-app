@@ -3,8 +3,9 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { RefreshCw, Zap, Hash, CalendarDays } from "lucide-react"
 import { cn, formatCurrency } from "@/lib/utils"
-import { expenses } from "@/lib/dummy-data"
 import { useGroup } from "@/components/providers/GroupProvider"
+import { useQuery } from "@tanstack/react-query"
+import { getExpenses } from "@/lib/actions/finance"
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 function fmtDate(iso: string): string {
@@ -12,7 +13,6 @@ function fmtDate(iso: string): string {
   return `${parseInt(d)} ${MONTHS[parseInt(m) - 1]}`
 }
 
-// Monthly cost for a recurring expense, normalised to a monthly figure
 function monthlyEquivalent(amount: number, frequency: string): number {
   switch (frequency) {
     case "weekly":      return amount * 52 / 12
@@ -23,14 +23,16 @@ function monthlyEquivalent(amount: number, frequency: string): number {
   }
 }
 
-const currentMonth = "2026-04"
-
 export function ExpenseStats() {
   const { activeGroup, activeEvent } = useGroup()
   const currency = activeGroup.currency
-  const groupExpenses = activeEvent
-    ? expenses.filter((e) => e.eventId === activeEvent.id)
-    : expenses.filter((e) => e.groupId === activeGroup.id)
+
+  const { data: groupExpenses = [] } = useQuery({
+    queryKey: ["expenses", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: () => getExpenses(activeGroup.id, activeEvent?.id),
+  })
+
+  const currentMonth = new Date().toISOString().slice(0, 7)
   const recurring = groupExpenses.filter((e) => e.recurring)
   const oneOff = groupExpenses.filter((e) => !e.recurring && e.date.startsWith(currentMonth))
 

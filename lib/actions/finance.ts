@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
-import type { Budget, Expense, Income, Loan, LoanRepayment } from "@/lib/dummy-data"
+import type { Budget, Expense, Income, Loan, LoanRepayment } from "@/lib/types"
 
 // ─── Budget ─────────────────────────────────────────────────────────────────
 

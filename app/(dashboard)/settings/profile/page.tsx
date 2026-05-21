@@ -6,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { User } from "lucide-react"
-import { userProfile } from "@/lib/dummy-data"
 import { useAuth } from "@/components/providers/AuthProvider"
-import type { UserRole } from "@/lib/dummy-users"
+import { getAppSettings, saveAppSettings } from "@/lib/session"
+import type { UserRole } from "@/lib/session"
 
 const ROLE_PILL: Record<UserRole, { label: string; className: string }> = {
   admin:   { label: "Admin",   className: "bg-primary/10 text-primary" },
@@ -40,23 +40,26 @@ const TIMEZONES = [
 
 export default function ProfilePage() {
   const { user, setUser } = useAuth()
-  const [name, setName] = useState(userProfile.name)
-  const [email, setEmail] = useState(userProfile.email)
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [currency, setCurrency] = useState("AUD")
+  const [timezone, setTimezone] = useState("Australia/Brisbane")
+  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     if (user) {
       setName(user.name)
       setEmail(user.email)
     }
+    const settings = getAppSettings()
+    setCurrency(settings.defaultCurrency)
+    setTimezone(settings.defaultTimezone)
   }, [user])
-  const [currency, setCurrency] = useState(userProfile.currency)
-  const [timezone, setTimezone] = useState(userProfile.timezone)
-  const [saved, setSaved] = useState(false)
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    // Update the session cookie with new name/email
     if (user) setUser({ ...user, name, email, role: user.role })
+    saveAppSettings({ defaultCurrency: currency, defaultTimezone: timezone, defaultThemeColor: getAppSettings().defaultThemeColor })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }

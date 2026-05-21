@@ -6,7 +6,7 @@ import { Plus, X, CheckCircle2, Circle, AlertCircle, ListTodo } from "lucide-rea
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { type Task } from "@/lib/dummy-data"
+import { type Task } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { TaskList } from "@/components/dashboard/TaskList"
 import { EventFilter } from "@/components/ui/EventFilter"

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { useQuery } from "@tanstack/react-query"
 import { getTasks } from "@/lib/actions/tasks"
-import type { Task } from "@/lib/dummy-data"
+import type { Task } from "@/lib/types"
 
 const priorityStyles = {
   high: "bg-destructive/10 text-destructive",

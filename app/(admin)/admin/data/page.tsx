@@ -9,7 +9,7 @@ import { useAuth } from "@/components/providers/AuthProvider"
 import { useQuery } from "@tanstack/react-query"
 import { getGroups, getGroupDataCounts } from "@/lib/actions/groups"
 import { cn } from "@/lib/utils"
-import type { Group } from "@/lib/dummy-data"
+import type { Group } from "@/lib/types"
 
 function GroupDataCard({ group }: { group: Group }) {
   const { data: counts } = useQuery({

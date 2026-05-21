@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { decodeSession } from "@/lib/dummy-users"
+import { decodeSession } from "@/lib/session"
 
 const PUBLIC_PATHS = ["/login", "/register"]
 

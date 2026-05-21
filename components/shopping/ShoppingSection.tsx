@@ -6,7 +6,7 @@ import { Plus, X, ShoppingCart, PackageCheck, DollarSign, Store } from "lucide-r
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { type ShoppingItem } from "@/lib/dummy-data"
+import { type ShoppingItem } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { ShoppingList } from "@/components/dashboard/ShoppingList"
 import { EventFilter } from "@/components/ui/EventFilter"

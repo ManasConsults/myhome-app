@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
-import type { Note } from "@/lib/dummy-data"
+import type { Note } from "@/lib/types"
 
 function serialize(n: Awaited<ReturnType<typeof prisma.note.findFirst>>): Note {
   if (!n) throw new Error("Note not found")

@@ -3,15 +3,18 @@
 import { Target, TrendingDown, CheckCircle2, AlertCircle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn, formatCurrency } from "@/lib/utils"
-import { userBudgets } from "@/lib/dummy-data"
 import { useGroup } from "@/components/providers/GroupProvider"
+import { useQuery } from "@tanstack/react-query"
+import { getBudgets } from "@/lib/actions/finance"
 
 export function BudgetStats() {
   const { activeGroup, activeEvent } = useGroup()
   const currency = activeGroup.currency
-  const groupBudgets = activeEvent
-    ? userBudgets.filter((b) => b.eventId === activeEvent.id)
-    : userBudgets.filter((b) => b.groupId === activeGroup.id)
+
+  const { data: groupBudgets = [] } = useQuery({
+    queryKey: ["budgets", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: () => getBudgets(activeGroup.id, activeEvent?.id),
+  })
 
   const totalBudgeted = groupBudgets.reduce((sum, b) => sum + b.amount, 0)
   const totalSpent = groupBudgets.reduce((sum, b) => sum + b.spent, 0)

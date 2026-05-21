@@ -1,7 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/db/prisma"
-import type { SessionPayload, UserRole, UserStatus } from "@/lib/dummy-users"
+import type { SessionPayload, UserRole, UserStatus } from "@/lib/session"
 
 export type UserRecord = {
   id: string

@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
-import type { AppEvent } from "@/lib/dummy-data"
+import type { AppEvent } from "@/lib/types"
 
 type EventFilterProps = {
   events: AppEvent[]

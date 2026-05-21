@@ -6,7 +6,7 @@ import { Plus, X, RefreshCw, Calendar, Pencil, Trash2, ArrowUp, ArrowDown } from
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { type Expense } from "@/lib/dummy-data"
+import { type Expense } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { EventFilter } from "@/components/ui/EventFilter"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { useQueries } from "@tanstack/react-query"
 import { getExpenses, getIncomes } from "@/lib/actions/finance"
-import type { Expense, Income } from "@/lib/dummy-data"
+import type { Expense, Income } from "@/lib/types"
 
 const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { notes, type Note } from "@/lib/dummy-data"
+import { type Note } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Pin, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -52,13 +52,13 @@ const cardVariants = {
 }
 
 interface NotesGridProps {
-  data?: Note[]
+  data: Note[]
   onEdit?: (note: Note) => void
   onDelete?: (id: string) => void
 }
 
 export function NotesGrid({ data, onEdit, onDelete }: NotesGridProps) {
-  const source = data ?? notes
+  const source = data
   const [sortBy, setSortBy] = useState<SortKey>("updatedAt")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
   const [deleteId, setDeleteId] = useState<string | null>(null)

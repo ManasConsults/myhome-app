@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { calendarEvents, type CalendarEvent } from "@/lib/dummy-data"
+import { type CalendarEvent } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CalendarDays, ArrowUp, ArrowDown } from "lucide-react"
@@ -46,13 +46,12 @@ function getCategoryLabel(category: CalendarEvent["category"]): string {
   return category.charAt(0).toUpperCase() + category.slice(1)
 }
 
-export function UpcomingEvents({ data }: { data?: CalendarEvent[] }) {
-  const source = data ?? calendarEvents
+export function UpcomingEvents({ data }: { data: CalendarEvent[] }) {
   const [sortBy, setSortBy] = useState<SortKey>("date")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
 
-  const today = "2026-04-01"
-  const upcoming = source
+  const today = new Date().toISOString().slice(0, 10)
+  const upcoming = data
     .filter((e) => e.date >= today)
     .sort((a, b) => {
       const dir = sortDir === "asc" ? 1 : -1

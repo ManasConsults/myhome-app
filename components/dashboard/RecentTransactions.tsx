@@ -8,7 +8,7 @@ import { cn, formatCurrency } from "@/lib/utils"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { useQueries } from "@tanstack/react-query"
 import { getExpenses, getIncomes } from "@/lib/actions/finance"
-import type { Expense, Income } from "@/lib/dummy-data"
+import type { Expense, Income } from "@/lib/types"
 
 const container = {
   hidden: {},

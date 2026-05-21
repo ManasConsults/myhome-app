@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { useQuery } from "@tanstack/react-query"
 import { getExpenses } from "@/lib/actions/finance"
-import type { Expense } from "@/lib/dummy-data"
+import type { Expense } from "@/lib/types"
 
 const CHART_COLORS = [
   "var(--color-chart-1)",

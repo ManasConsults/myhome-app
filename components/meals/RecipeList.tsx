@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { type Recipe } from "@/lib/dummy-data"
+import { type Recipe } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 type SortKey = "name" | "prepTime" | "calories"

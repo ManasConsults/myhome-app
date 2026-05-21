@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
-import type { ShoppingItem } from "@/lib/dummy-data"
+import type { ShoppingItem } from "@/lib/types"
 
 function serialize(s: Awaited<ReturnType<typeof prisma.shoppingItem.findFirst>>): ShoppingItem {
   if (!s) throw new Error("ShoppingItem not found")

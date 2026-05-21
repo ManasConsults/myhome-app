@@ -18,7 +18,7 @@ import { getNotes } from "@/lib/actions/notes"
 import { getCalendarEvents } from "@/lib/actions/calendar"
 import { getBudgets, getExpenses, getIncomes, getLoans } from "@/lib/actions/finance"
 import { getRecipes } from "@/lib/actions/meals"
-import type { Task, ShoppingItem, Note, CalendarEvent, Budget, Expense, Income, Loan, Recipe } from "@/lib/dummy-data"
+import type { Task, ShoppingItem, Note, CalendarEvent, Budget, Expense, Income, Loan, Recipe } from "@/lib/types"
 
 type ResultType = "task" | "shopping" | "note" | "calendar" | "expense" | "income" | "budget" | "loan" | "recipe"
 
