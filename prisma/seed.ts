@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client"
 import { PrismaPg } from "@prisma/adapter-pg"
+import bcrypt from "bcryptjs"
 
 const adapter = new PrismaPg(process.env.DATABASE_URL!)
 const prisma = new PrismaClient({ adapter })
@@ -8,13 +9,14 @@ function d(s: string): Date { return new Date(s) }
 
 async function main() {
   // ── Users ──────────────────────────────────────────────────────────────────
+  const hashedPassword = await bcrypt.hash("demo1234", 12)
   const seedUser = await prisma.user.upsert({
     where: { email: "demo@myhome.app" },
-    update: {},
+    update: { password: hashedPassword },
     create: {
       name: "Manas Mallick",
       email: "demo@myhome.app",
-      password: "demo1234",
+      password: hashedPassword,
       role: "admin",
       status: "active",
       createdAt: d("2024-01-01"),

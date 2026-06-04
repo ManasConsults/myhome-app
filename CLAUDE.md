@@ -8,20 +8,23 @@ Database-connected. Data is served from Neon PostgreSQL via Prisma 7. Real Auth.
 
 Core UI pages exist for all features. Groups are implemented — all data types carry a `groupId` and the active group is managed by `GroupProvider`. Finance is feature-complete: budgets (with edit/delete), expense tracking, income (recurring + one-off), and loan tracking (lend/borrow, repayment history, interest). Global search is implemented in the header. Active development: wiring remaining features to the database and implementing real auth.
 
-### Dummy Auth
+### Auth
 
-Cookie-based session auth is wired up for the UI phase:
+Real auth using bcrypt + httpOnly JWT cookie.
 
-- **Session cookie:** `myhome-session` = `btoa(JSON.stringify({ userId, name, email, role }))`. Not httpOnly — readable by both proxy.ts and client JS.
-- **Route protection:** `proxy.ts` (project root) — Next.js 16 uses this directly (no `middleware.ts`). Public paths: `/login`, `/register`.
-- **Dummy users:** `lib/dummy-users.ts` — `SEED_USER` (demo@myhome.app / demo1234, role: `"admin"`) always present; registered accounts stored in `localStorage["myhome-registered-users"]` with role: `"user"` by default.
-- **Auth context:** `AuthProvider` in `components/providers/AuthProvider.tsx` wraps the root layout. `useAuth()` returns `{ user: SessionPayload | null, setUser, logout }`. `SessionPayload` includes `role`.
-- **Roles:** `UserRole = "admin" | "manager" | "user"`. Seed user is `"admin"`. New registrations default to `"user"`. Role is stored in the session cookie and available via `useAuth().user.role`.
+- **Session cookie:** `myhome-session` — httpOnly, Secure in production, SameSite=Lax, 7-day expiry. Value is a signed HS256 JWT containing `{ userId, name, email, role }`.
+- **Secret:** `SESSION_SECRET` env var — 32-byte hex string. Required in `.env`, Vercel env vars, and GitHub Actions secrets.
+- **Password hashing:** bcryptjs, cost factor 12. Legacy plaintext passwords are re-hashed on first login.
+- **Route protection:** `proxy.ts` (project root) — Next.js 16 uses this directly (no `middleware.ts`). Public paths: `/login`, `/register`. Admin paths require `role === "admin"`.
+- **Session functions:** `signSession(payload)` / `verifySession(token)` in `lib/session.ts` (async, jose).
+- **Cookie management:** Set/cleared exclusively by server actions in `lib/actions/auth.ts` via `cookies()` from `next/headers`.
+- **Auth context:** `AuthProvider` in `components/providers/AuthProvider.tsx` wraps the root layout. On mount fetches `/api/auth/me` (reads httpOnly cookie server-side). `useAuth()` returns `{ user: SessionPayload | null, setUser, logout }`.
+- **`setUser(payload)`** — updates local display state only (cookie is already set by the server action that logged in the user).
+- **`logout()`** — calls `logoutAction()` server action (clears cookie), then navigates to `/login`.
+- **Roles:** `UserRole = "admin" | "manager" | "user"`. Seed user is `"admin"`. New registrations default to `"user"`, status `"pending"` — require admin approval before they can log in.
 - **Role pill:** admin: `bg-primary/10 text-primary`, manager: `bg-warning/10 text-warning`, user: `bg-muted text-muted-foreground`. Labels — `"Admin"` / `"Manager"` / `"Member"`. Use `ROLE_PILL` constant defined locally in each component.
-- **New users:** `GroupProvider` auto-creates a default "My Home" group for users with no groups, stored in `localStorage["myhome-user-groups-{userId}"]`.
-- **Group ownership:** `Group` type has `userId: string`. All seed groups have `userId: "user-1"`. `GroupProvider` filters groups by current user's `userId`.
-- **Profile page:** Initialises name/email from `useAuth().user`; saving updates the cookie via `setUser()`.
-- **Sign out:** `ProfileDropdown` calls `useAuth().logout()` which clears the cookie and navigates to `/login`.
+- **Profile page:** Initialises name/email from `useAuth().user`; saving calls `setUser()` to update local display state.
+- **Seed user:** demo@myhome.app / demo1234 — password is bcrypt-hashed by `prisma/seed.ts`.
 
 ### Sort options
 

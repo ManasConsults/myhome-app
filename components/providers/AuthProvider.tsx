@@ -2,13 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
-import {
-  type SessionPayload,
-  SESSION_COOKIE,
-  SESSION_MAX_AGE,
-  encodeSession,
-  decodeSession,
-} from "@/lib/session"
+import { type SessionPayload } from "@/lib/session"
+import { logoutAction } from "@/lib/actions/auth"
 
 interface AuthContextValue {
   user: SessionPayload | null
@@ -22,29 +17,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const [user, setUserState] = useState<SessionPayload | null>(null)
 
-  // Read session cookie after mount to avoid SSR hydration mismatch
   useEffect(() => {
-    const match = document.cookie
-      .split("; ")
-      .find((r) => r.startsWith(`${SESSION_COOKIE}=`))
-    if (match) {
-      const value = match.split("=").slice(1).join("=")
-      const payload = decodeSession(value)
-      if (payload) {
-        setUserState(payload)
-      }
-    }
+    fetch("/api/auth/me")
+      .then((r) => r.json() as Promise<SessionPayload | null>)
+      .then((data) => { if (data) setUserState(data) })
+      .catch(() => {})
   }, [])
 
   function setUser(payload: SessionPayload) {
     setUserState(payload)
-    document.cookie = `${SESSION_COOKIE}=${encodeSession(payload)}; path=/; max-age=${SESSION_MAX_AGE}; SameSite=Lax`
   }
 
   function logout() {
     setUserState(null)
-    document.cookie = `${SESSION_COOKIE}=; path=/; max-age=0`
-    router.push("/login")
+    logoutAction().then(() => router.push("/login"))
   }
 
   return (

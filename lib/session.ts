@@ -1,3 +1,5 @@
+import { SignJWT, jwtVerify } from "jose"
+
 export type UserRole = "admin" | "manager" | "user"
 export type UserStatus = "pending" | "active" | "rejected"
 
@@ -11,17 +13,33 @@ export type SessionPayload = {
 export const SESSION_COOKIE = "myhome-session"
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7 // 7 days
 
-export function encodeSession(payload: SessionPayload): string {
-  return btoa(JSON.stringify(payload))
+function getSecret(): Uint8Array {
+  return new TextEncoder().encode(process.env.SESSION_SECRET ?? "")
 }
 
-export function decodeSession(value: string): SessionPayload | null {
+export async function signSession(payload: SessionPayload): Promise<string> {
+  return new SignJWT({ ...payload })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("7d")
+    .sign(getSecret())
+}
+
+export async function verifySession(token: string): Promise<SessionPayload | null> {
   try {
-    return JSON.parse(atob(value)) as SessionPayload
+    const { payload } = await jwtVerify(token, getSecret())
+    return {
+      userId: payload.userId as string,
+      name: payload.name as string,
+      email: payload.email as string,
+      role: payload.role as UserRole,
+    }
   } catch {
     return null
   }
 }
+
+// ── App settings (client-only, persisted to localStorage) ────────────────────
 
 export type AppSettings = {
   defaultCurrency: string

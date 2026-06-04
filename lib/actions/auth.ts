@@ -1,7 +1,16 @@
 "use server"
 
+import { cookies } from "next/headers"
+import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db/prisma"
-import type { SessionPayload, UserRole, UserStatus } from "@/lib/session"
+import {
+  signSession,
+  SESSION_COOKIE,
+  SESSION_MAX_AGE,
+  type SessionPayload,
+  type UserRole,
+  type UserStatus,
+} from "@/lib/session"
 
 export type UserRecord = {
   id: string
@@ -16,27 +25,49 @@ function isSeedUser(user: { email: string }) {
   return user.email === "demo@myhome.app"
 }
 
+async function setSessionCookie(payload: SessionPayload): Promise<void> {
+  const token = await signSession(payload)
+  const jar = await cookies()
+  jar.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: SESSION_MAX_AGE,
+    path: "/",
+  })
+}
+
 export async function loginAction(
   email: string,
   password: string,
 ): Promise<{ success: true; user: SessionPayload } | { success: false; error: string }> {
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } })
 
-  if (!user || user.password !== password) {
-    if (user?.status === "pending") return { success: false, error: "Your account is awaiting admin approval." }
-    if (user?.status === "rejected") return { success: false, error: "Your account request was not approved. Contact the admin." }
-    return { success: false, error: "Invalid email or password." }
+  if (!user) return { success: false, error: "Invalid email or password." }
+
+  if (user.status === "pending") return { success: false, error: "Your account is awaiting admin approval." }
+  if (user.status === "rejected") return { success: false, error: "Your account request was not approved. Contact the admin." }
+  if (user.status !== "active") return { success: false, error: "Your account is not active." }
+
+  const storedPassword = user.password ?? ""
+
+  // Support both bcrypt hashes (new) and plaintext (legacy migration path)
+  const isPlaintext = !storedPassword.startsWith("$2")
+  const valid = isPlaintext
+    ? storedPassword === password
+    : await bcrypt.compare(password, storedPassword)
+
+  if (!valid) return { success: false, error: "Invalid email or password." }
+
+  // Re-hash plaintext passwords on first login
+  if (isPlaintext) {
+    const hashed = await bcrypt.hash(password, 12)
+    await prisma.user.update({ where: { id: user.id }, data: { password: hashed } })
   }
 
-  if (user.status !== "active") {
-    if (user.status === "pending") return { success: false, error: "Your account is awaiting admin approval." }
-    return { success: false, error: "Your account request was not approved. Contact the admin." }
-  }
-
-  return {
-    success: true,
-    user: { userId: user.id, name: user.name, email: user.email, role: user.role as UserRole },
-  }
+  const payload: SessionPayload = { userId: user.id, name: user.name, email: user.email, role: user.role as UserRole }
+  await setSessionCookie(payload)
+  return { success: true, user: payload }
 }
 
 export async function registerAction(data: {
@@ -47,16 +78,23 @@ export async function registerAction(data: {
   const existing = await prisma.user.findUnique({ where: { email: data.email.toLowerCase().trim() } })
   if (existing) return { success: false, error: "An account with this email already exists." }
 
+  const hashed = await bcrypt.hash(data.password, 12)
+
   await prisma.user.create({
     data: {
       name: data.name.trim(),
       email: data.email.toLowerCase().trim(),
-      password: data.password,
+      password: hashed,
       role: "user",
       status: "pending",
     },
   })
   return { success: true }
+}
+
+export async function logoutAction(): Promise<void> {
+  const jar = await cookies()
+  jar.delete(SESSION_COOKIE)
 }
 
 export async function getUsers(): Promise<UserRecord[]> {
