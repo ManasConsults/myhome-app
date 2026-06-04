@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,6 @@ import { AppLogoMark } from "@/components/ui/AppLogo"
 import { getLoginBlockReason } from "@/lib/actions/auth"
 
 function LoginForm() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -45,7 +44,7 @@ function LoginForm() {
       return
     }
 
-    router.push("/")
+    window.location.href = "/"
   }
 
   return (

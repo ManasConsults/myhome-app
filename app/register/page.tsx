@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AppLogoMark } from "@/components/ui/AppLogo"
-import { Clock } from "lucide-react"
+import { Clock, CheckCircle } from "lucide-react"
 import { registerAction } from "@/lib/actions/auth"
 
 export default function RegisterPage() {
@@ -16,6 +16,7 @@ export default function RegisterPage() {
   const [confirm, setConfirm] = useState("")
   const [error, setError] = useState("")
   const [submitted, setSubmitted] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -39,6 +40,7 @@ export default function RegisterPage() {
       setError(result.error)
       return
     }
+    setIsAdmin(result.isAdmin)
     setSubmitted(true)
   }
 
@@ -51,19 +53,37 @@ export default function RegisterPage() {
           transition={{ duration: 0.3, ease: "easeOut" }}
           className="w-full max-w-sm flex flex-col items-center gap-6 text-center"
         >
-          <div className="size-16 rounded-2xl bg-warning/10 flex items-center justify-center">
-            <Clock className="size-8 text-warning" />
-          </div>
-          <div className="flex flex-col gap-2">
-            <h1 className="text-xl font-bold tracking-tight">Request submitted</h1>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Your account is pending admin approval.
-              <br />
-              You&apos;ll be able to sign in once an admin approves your request.
-            </p>
-          </div>
+          {isAdmin ? (
+            <>
+              <div className="size-16 rounded-2xl bg-success/10 flex items-center justify-center">
+                <CheckCircle className="size-8 text-success" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <h1 className="text-xl font-bold tracking-tight">Account created</h1>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Your admin account and a default household are ready.
+                  <br />
+                  Sign in to get started.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="size-16 rounded-2xl bg-warning/10 flex items-center justify-center">
+                <Clock className="size-8 text-warning" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <h1 className="text-xl font-bold tracking-tight">Request submitted</h1>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Your account is pending admin approval.
+                  <br />
+                  You&apos;ll be able to sign in once an admin approves your request.
+                </p>
+              </div>
+            </>
+          )}
           <Link href="/login" className="text-sm text-primary hover:underline font-medium">
-            Back to sign in
+            {isAdmin ? "Sign in →" : "Back to sign in"}
           </Link>
         </motion.div>
       </div>

@@ -29,7 +29,7 @@ export async function registerAction(data: {
   name: string
   email: string
   password: string
-}): Promise<{ success: true } | { success: false; error: string }> {
+}): Promise<{ success: true; isAdmin: boolean } | { success: false; error: string }> {
   const existing = await prisma.user.findUnique({ where: { email: data.email.toLowerCase().trim() } })
   if (existing) return { success: false, error: "An account with this email already exists." }
 
@@ -37,7 +37,7 @@ export async function registerAction(data: {
   // First user ever becomes the admin and is immediately active — bootstraps an empty deployment
   const isFirstUser = (await prisma.user.count()) === 0
 
-  await prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       name: data.name.trim(),
       email: data.email.toLowerCase().trim(),
@@ -46,7 +46,21 @@ export async function registerAction(data: {
       status: isFirstUser ? "active" : "pending",
     },
   })
-  return { success: true }
+
+  if (isFirstUser) {
+    await prisma.group.create({
+      data: {
+        name: "My Home",
+        icon: "🏠",
+        color: "primary",
+        currency: "USD",
+        isDefault: true,
+        userId: user.id,
+      },
+    })
+  }
+
+  return { success: true, isAdmin: isFirstUser }
 }
 
 export async function getUsers(): Promise<UserRecord[]> {
