@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { AppLogoMark } from "@/components/ui/AppLogo"
 import { getLoginBlockReason } from "@/lib/actions/auth"
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
@@ -129,5 +129,13 @@ export default function LoginPage() {
         )}
       </motion.div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   )
 }
