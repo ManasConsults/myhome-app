@@ -1,56 +1,32 @@
-import { NextRequest, NextResponse } from "next/server"
-import { jwtVerify } from "jose"
+import { auth } from "@/auth"
+import { NextResponse } from "next/server"
 
-const SESSION_COOKIE = "myhome-session"
-const PUBLIC_PATHS = ["/login", "/register"]
-
-// ALLOWED_DOMAIN is set in Vercel env vars (production + preview).
-// Omit in local dev (.env.local) to skip the check.
 const ALLOWED_DOMAIN = process.env.ALLOWED_DOMAIN
 
-async function verifyToken(token: string): Promise<{ role?: string } | null> {
-  try {
-    const secret = new TextEncoder().encode(process.env.SESSION_SECRET ?? "")
-    const { payload } = await jwtVerify(token, secret)
-    return payload as { role?: string }
-  } catch {
-    return null
-  }
-}
-
-export default async function proxy(request: NextRequest) {
+export default auth((req) => {
   if (ALLOWED_DOMAIN) {
-    const host = request.headers.get("host") ?? ""
-    const hostname = host.split(":")[0]
+    const hostname = (req.headers.get("host") ?? "").split(":")[0]
     if (hostname !== ALLOWED_DOMAIN && !hostname.endsWith(`.${ALLOWED_DOMAIN}`)) {
       return new NextResponse("Not found", { status: 404 })
     }
   }
 
-  const { pathname } = request.nextUrl
-  const token = request.cookies.get(SESSION_COOKIE)?.value
+  const { pathname } = req.nextUrl
+  const session = req.auth
 
-  // Admin gate — must be authenticated AND role === "admin"
   if (pathname.startsWith("/admin")) {
-    if (!token) return NextResponse.redirect(new URL("/login", request.url))
-    const payload = await verifyToken(token)
-    if (payload?.role !== "admin") return NextResponse.redirect(new URL("/", request.url))
+    if (!session) return NextResponse.redirect(new URL("/login", req.url))
+    if (session.user.role !== "admin") return NextResponse.redirect(new URL("/", req.url))
     return NextResponse.next()
   }
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
+  const isPublic = pathname.startsWith("/login") || pathname.startsWith("/register")
 
-  if (!token && !isPublic) return NextResponse.redirect(new URL("/login", request.url))
-
-  if (token && isPublic) {
-    // Only redirect if the token is valid — expired/tampered tokens let the
-    // user through to the login page so they can re-authenticate
-    const payload = await verifyToken(token)
-    if (payload) return NextResponse.redirect(new URL("/", request.url))
-  }
+  if (!session && !isPublic) return NextResponse.redirect(new URL("/login", req.url))
+  if (session && isPublic) return NextResponse.redirect(new URL("/", req.url))
 
   return NextResponse.next()
-}
+})
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon\\.ico|public/).*)"],

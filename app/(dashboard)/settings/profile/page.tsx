@@ -39,7 +39,7 @@ const TIMEZONES = [
 ]
 
 export default function ProfilePage() {
-  const { user, setUser } = useAuth()
+  const { user } = useAuth()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [currency, setCurrency] = useState("AUD")
@@ -58,7 +58,6 @@ export default function ProfilePage() {
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    if (user) setUser({ ...user, name, email, role: user.role })
     saveAppSettings({ defaultCurrency: currency, defaultTimezone: timezone, defaultThemeColor: getAppSettings().defaultThemeColor })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)

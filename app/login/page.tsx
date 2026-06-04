@@ -4,14 +4,13 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AppLogoMark } from "@/components/ui/AppLogo"
-import { useAuth } from "@/components/providers/AuthProvider"
-import { loginAction } from "@/lib/actions/auth"
+import { getLoginBlockReason } from "@/lib/actions/auth"
 
 export default function LoginPage() {
-  const { setUser } = useAuth()
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -23,15 +22,21 @@ export default function LoginPage() {
     setError("")
     setLoading(true)
 
-    const result = await loginAction(email, password)
-    setLoading(false)
-
-    if (!result.success) {
-      setError(result.error)
+    const blockReason = await getLoginBlockReason(email)
+    if (blockReason) {
+      setError(blockReason)
+      setLoading(false)
       return
     }
 
-    setUser(result.user)
+    const result = await signIn("credentials", { email, password, redirect: false })
+    setLoading(false)
+
+    if (result?.error) {
+      setError("Invalid email or password.")
+      return
+    }
+
     router.push("/")
   }
 

@@ -12,7 +12,7 @@ import { CalendarGrid } from "@/components/calendar/CalendarGrid"
 import { UpcomingEvents } from "@/components/calendar/UpcomingEvents"
 import { EventFilter } from "@/components/ui/EventFilter"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getCalendarEvents, createCalendarEvent, deleteCalendarEvent } from "@/lib/actions/calendar"
+import { getCalendarEvents, createCalendarEvent } from "@/lib/actions/calendar"
 
 const CATEGORIES: CalendarEvent["category"][] = ["appointment", "birthday", "holiday", "reminder", "social"]
 
@@ -56,7 +56,6 @@ export function CalendarSection() {
     queryClient.invalidateQueries({ queryKey: ["calendar", activeGroup.id] })
 
   const createMutation = useMutation({ mutationFn: createCalendarEvent, onSuccess: invalidate })
-  const deleteMutation = useMutation({ mutationFn: deleteCalendarEvent, onSuccess: invalidate })
 
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 

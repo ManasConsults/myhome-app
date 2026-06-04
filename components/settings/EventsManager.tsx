@@ -55,7 +55,7 @@ const EMPTY_FORM: FormState = {
 
 export function EventsManager() {
   const { user } = useAuth()
-  const userId = user?.userId ?? "user-1"
+  const userId = user?.id ?? ""
   const queryClient = useQueryClient()
   const formRef = useRef<HTMLDivElement>(null)
 

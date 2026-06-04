@@ -21,7 +21,7 @@ const GroupContext = createContext<GroupContextValue | null>(null)
 
 export function GroupProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
-  const userId = user?.userId ?? ""
+  const userId = user?.id ?? ""
 
   const { data: groups = [] } = useQuery({
     queryKey: ["groups", userId],

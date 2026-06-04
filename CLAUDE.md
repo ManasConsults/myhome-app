@@ -4,26 +4,28 @@ A multi-user, multi-household home management app. Features: finance tracking, t
 
 ## Current Phase
 
-Database-connected. Data is served from Neon PostgreSQL via Prisma 7. Real Auth.js v5 is planned but not wired up yet — cookie-based dummy auth is still active.
+Database-connected. Data is served from Neon PostgreSQL via Prisma 7. Auth.js v5 is active — email/password via CredentialsProvider with JWT sessions.
 
-Core UI pages exist for all features. Groups are implemented — all data types carry a `groupId` and the active group is managed by `GroupProvider`. Finance is feature-complete: budgets (with edit/delete), expense tracking, income (recurring + one-off), and loan tracking (lend/borrow, repayment history, interest). Global search is implemented in the header. Active development: wiring remaining features to the database and implementing real auth.
+Core UI pages exist for all features. Groups are implemented — all data types carry a `groupId` and the active group is managed by `GroupProvider`. Finance is feature-complete: budgets (with edit/delete), expense tracking, income (recurring + one-off), and loan tracking (lend/borrow, repayment history, interest). Global search is implemented in the header. Active development: wiring remaining features to the database.
 
 ### Auth
 
-Real auth using bcrypt + httpOnly JWT cookie.
+Auth.js v5 (next-auth@beta) — CredentialsProvider + JWT session strategy.
 
-- **Session cookie:** `myhome-session` — httpOnly, Secure in production, SameSite=Lax, 7-day expiry. Value is a signed HS256 JWT containing `{ userId, name, email, role }`.
-- **Secret:** `SESSION_SECRET` env var — 32-byte hex string. Required in `.env`, Vercel env vars, and GitHub Actions secrets.
-- **Password hashing:** bcryptjs, cost factor 12. Legacy plaintext passwords are re-hashed on first login.
-- **Route protection:** `proxy.ts` (project root) — Next.js 16 uses this directly (no `middleware.ts`). Public paths: `/login`, `/register`. Admin paths require `role === "admin"`.
-- **Session functions:** `signSession(payload)` / `verifySession(token)` in `lib/session.ts` (async, jose).
-- **Cookie management:** Set/cleared exclusively by server actions in `lib/actions/auth.ts` via `cookies()` from `next/headers`.
-- **Auth context:** `AuthProvider` in `components/providers/AuthProvider.tsx` wraps the root layout. On mount fetches `/api/auth/me` (reads httpOnly cookie server-side). `useAuth()` returns `{ user: SessionPayload | null, setUser, logout }`.
-- **`setUser(payload)`** — updates local display state only (cookie is already set by the server action that logged in the user).
-- **`logout()`** — calls `logoutAction()` server action (clears cookie), then navigates to `/login`.
-- **Roles:** `UserRole = "admin" | "manager" | "user"`. Seed user is `"admin"`. New registrations default to `"user"`, status `"pending"` — require admin approval before they can log in.
+- **Session cookie:** `authjs.session-token` — managed entirely by Auth.js (httpOnly, Secure in production, 7-day expiry).
+- **Secret:** `AUTH_SECRET` env var — 32-byte hex string. Required in `.env.local`, Vercel env vars, and GitHub Actions secrets.
+- **Password hashing:** bcryptjs, cost factor 12. Legacy plaintext passwords are re-hashed on first login (handled in `authorize()` in `auth.ts`).
+- **Auth config:** `auth.ts` (project root) — exports `handlers`, `auth`, `signIn`, `signOut`. CredentialsProvider `authorize()` validates credentials and checks `status === "active"`.
+- **Route protection:** `proxy.ts` (project root) — wraps Auth.js `auth()` middleware. Public paths: `/login`, `/register`. Admin paths require `session.user.role === "admin"`.
+- **Session server-side:** `auth()` from `@/auth` — use in Server Components and server actions.
+- **Session client-side:** `useSession()` from `next-auth/react` — wrapped by `useAuth()` shim in `components/providers/AuthProvider.tsx`.
+- **`useAuth()`** returns `{ user: AuthUser | null, logout }`. `AuthUser = { id, name, email, role }`. No `setUser` — Auth.js manages session state.
+- **`logout()`** — calls `signOut({ callbackUrl: "/login" })` from next-auth/react.
+- **Login flow:** Login page calls `getLoginBlockReason(email)` (server action — checks pending/rejected status) before calling `signIn("credentials", { redirect: false })`. Status-specific errors surface without custom Auth.js error subclasses.
+- **`SessionProvider`** wraps the root layout in `app/layout.tsx` — required for `useSession()` in client components.
+- **Roles:** `UserRole = "admin" | "manager" | "user"` in `lib/session.ts`. Seed user is `"admin"`. New registrations default to `"user"`, status `"pending"` — require admin approval before they can log in.
 - **Role pill:** admin: `bg-primary/10 text-primary`, manager: `bg-warning/10 text-warning`, user: `bg-muted text-muted-foreground`. Labels — `"Admin"` / `"Manager"` / `"Member"`. Use `ROLE_PILL` constant defined locally in each component.
-- **Profile page:** Initialises name/email from `useAuth().user`; saving calls `setUser()` to update local display state.
+- **Profile page:** Initialises name/email from `useAuth().user`. Saving persists to `AppSettings` (localStorage) only — does not update session or DB.
 - **Seed user:** demo@myhome.app / demo1234 — password is bcrypt-hashed by `prisma/seed.ts`.
 
 ### Sort options
@@ -71,10 +73,11 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 `next.config.ts` has `cacheComponents: true`. Cache slow/shared data; never cache user-specific real-time data.
 
 ### proxy.ts (Next.js 16 — no middleware.ts)
-Next.js 16 uses `proxy.ts` at the project root for route protection. Do **not** create `middleware.ts` — having both causes a build error. Export function name is `proxy`:
+Next.js 16 uses `proxy.ts` at the project root for route protection. Do **not** create `middleware.ts` — having both causes a build error. The file wraps Auth.js middleware:
 
 ```tsx
-export default function proxy(request: NextRequest) { ... }
+import { auth } from "@/auth"
+export default auth((req) => { ... })
 ```
 
 ### React Compiler

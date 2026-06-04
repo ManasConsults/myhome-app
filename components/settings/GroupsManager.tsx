@@ -42,7 +42,7 @@ const DEFAULT_FORM: FormState = { name: "", location: "", icon: "🏠", color: "
 
 export function GroupsManager() {
   const { user } = useAuth()
-  const userId = user?.userId ?? "user-1"
+  const userId = user?.id ?? ""
   const queryClient = useQueryClient()
   const formRef = useRef<HTMLDivElement>(null)
 

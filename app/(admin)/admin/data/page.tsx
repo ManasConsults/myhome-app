@@ -120,7 +120,7 @@ function GroupDataCard({ group }: { group: Group }) {
 
 export default function AdminDataPage() {
   const { user } = useAuth()
-  const userId = user?.userId ?? "user-1"
+  const userId = user?.id ?? ""
 
   const { data: groups = [] } = useQuery<Group[]>({
     queryKey: ["groups", userId],
