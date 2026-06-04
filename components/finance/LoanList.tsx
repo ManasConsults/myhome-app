@@ -330,7 +330,7 @@ export function LoanList({ loans, repayments, currency, onAddRepayment, onEdit, 
                       </div>
 
                       {loan.notes && (
-                        <p className="text-xs text-muted-foreground italic">"{loan.notes}"</p>
+                        <p className="text-xs text-muted-foreground italic">&quot;{loan.notes}&quot;</p>
                       )}
 
                       {/* Repayment history */}

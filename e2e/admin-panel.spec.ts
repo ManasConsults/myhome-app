@@ -125,7 +125,6 @@ test.describe('Admin Panel', () => {
     })
 
     test('shows at least 1 admin (SEED_USER is admin)', async ({ page }) => {
-      const adminCard = page.locator('text=Admins').locator('..').locator('..').getByText('1')
       // The admin count is at least 1 — just check the stat area is populated
       const statArea = page.locator('[class*="grid"]').first()
       await expect(statArea).toBeVisible()

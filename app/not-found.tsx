@@ -9,7 +9,7 @@ export default function NotFound() {
         <p className="text-7xl font-bold tracking-tight text-muted-foreground/30 mb-4">404</p>
         <h1 className="text-xl font-semibold mb-2">Page not found</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          The page you're looking for doesn't exist or has been moved.
+          {"The page you're looking for doesn't exist or has been moved."}
         </p>
         <Button render={<Link href="/" />}>
           <Home data-icon="inline-start" />

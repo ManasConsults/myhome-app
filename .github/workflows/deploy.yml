@@ -26,6 +26,15 @@ jobs:
 
       - name: Generate Prisma client
         run: npx prisma generate
+        env:
+          DATABASE_URL: "postgresql://localhost:5432/dummy"
+          DATABASE_URL_UNPOOLED: "postgresql://localhost:5432/dummy"
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest

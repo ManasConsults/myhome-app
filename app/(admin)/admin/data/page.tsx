@@ -139,7 +139,7 @@ export default function AdminDataPage() {
           className="flex flex-col gap-4"
         >
           <p className="text-sm text-muted-foreground">
-            Record counts are live from the database. "Reset UI" clears <code className="text-xs bg-muted px-1 py-0.5 rounded">myhome-*</code> localStorage keys (active group, theme, nav state) and reloads.
+            Record counts are live from the database. &quot;Reset UI&quot; clears <code className="text-xs bg-muted px-1 py-0.5 rounded">myhome-*</code> localStorage keys (active group, theme, nav state) and reloads.
           </p>
 
           {groups.map((g) => (

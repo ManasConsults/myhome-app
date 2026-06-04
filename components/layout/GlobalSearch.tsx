@@ -223,7 +223,7 @@ export function GlobalSearch() {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault()
-        open ? closeSearch() : openSearch()
+        if (open) closeSearch(); else openSearch()
       }
       if (e.key === "Escape") closeSearch()
     }
@@ -310,7 +310,7 @@ export function GlobalSearch() {
                     </p>
                   ) : results.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-10">
-                      No results for <span className="text-foreground font-medium">"{query}"</span>
+                      No results for <span className="text-foreground font-medium">&quot;{query}&quot;</span>
                     </p>
                   ) : (
                     <div className="py-2">

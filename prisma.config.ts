@@ -1,4 +1,4 @@
-import { defineConfig, env } from "prisma/config"
+import { defineConfig } from "prisma/config"
 import { config } from "dotenv"
 import { resolve } from "path"
 
@@ -11,6 +11,8 @@ export default defineConfig({
     seed: "npx tsx prisma/seed.ts",
   },
   datasource: {
-    url: env("DATABASE_URL_UNPOOLED"),
+    // Use direct (non-pooled) URL for migrations; fall back to DATABASE_URL
+    // for prisma generate in CI where no DB connection is needed.
+    url: (process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL) as string,
   },
 })

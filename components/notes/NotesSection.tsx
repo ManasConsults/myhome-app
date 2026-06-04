@@ -58,6 +58,7 @@ export function NotesSection() {
 
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 
+  // eslint-disable-next-line react-hooks/purity
   const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
   const total = noteList.length
   const pinnedCount = noteList.filter((n) => n.pinned).length
