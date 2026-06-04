@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useQuery } from "@tanstack/react-query"
+import Link from "next/link"
 import { useAuth } from "@/components/providers/AuthProvider"
 import { getGroups } from "@/lib/actions/groups"
 import { getEventsByUser } from "@/lib/actions/events"
@@ -23,7 +24,7 @@ export function GroupProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const userId = user?.id ?? ""
 
-  const { data: groups = [] } = useQuery({
+  const { data: groups = [], isPending: groupsPending } = useQuery({
     queryKey: ["groups", userId],
     queryFn: () => getGroups(userId),
     enabled: !!userId,
@@ -85,7 +86,29 @@ export function GroupProvider({ children }: { children: ReactNode }) {
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? groups[0]
   const activeEvent = events.find((e) => e.id === activeEventId) ?? null
 
-  if (!activeGroup) return null
+  // Still fetching — don't render yet (avoids flash of no-group state)
+  if (groupsPending && !!userId) return null
+
+  // Loaded, but this user belongs to no groups yet
+  if (!activeGroup) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        {user?.role === "admin" ? (
+          <div className="flex flex-col items-center gap-3 text-center">
+            <p className="text-sm text-muted-foreground">No households yet. Create one to get started.</p>
+            <Link href="/settings/groups" className="text-sm text-primary hover:underline font-medium">
+              Create your first household →
+            </Link>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center">
+            Your account is active, but you haven&apos;t been added to a group yet.
+            <br />Ask your admin to add you to a household.
+          </p>
+        )}
+      </div>
+    )
+  }
 
   return (
     <GroupContext.Provider value={{

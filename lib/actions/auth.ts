@@ -34,14 +34,16 @@ export async function registerAction(data: {
   if (existing) return { success: false, error: "An account with this email already exists." }
 
   const hashed = await bcrypt.hash(data.password, 12)
+  // First user ever becomes the admin and is immediately active — bootstraps an empty deployment
+  const isFirstUser = (await prisma.user.count()) === 0
 
   await prisma.user.create({
     data: {
       name: data.name.trim(),
       email: data.email.toLowerCase().trim(),
       password: hashed,
-      role: "user",
-      status: "pending",
+      role: isFirstUser ? "admin" : "user",
+      status: isFirstUser ? "active" : "pending",
     },
   })
   return { success: true }

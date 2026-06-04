@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
@@ -12,10 +12,18 @@ import { getLoginBlockReason } from "@/lib/actions/auth"
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+
+  // Auth.js v5 redirects to /login?error=CredentialsSignin on failed credentials
+  useEffect(() => {
+    if (searchParams.get("error")) {
+      setError("Invalid email or password.")
+    }
+  }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -32,7 +40,7 @@ export default function LoginPage() {
     const result = await signIn("credentials", { email, password, redirect: false })
     setLoading(false)
 
-    if (result?.error) {
+    if (!result?.ok || result?.error) {
       setError("Invalid email or password.")
       return
     }
@@ -114,9 +122,11 @@ export default function LoginPage() {
           </Link>
         </p>
 
-        <p className="text-xs text-center text-muted-foreground/60">
-          Demo: demo@myhome.app / demo1234
-        </p>
+        {process.env.NODE_ENV === "development" && (
+          <p className="text-xs text-center text-muted-foreground/60">
+            Dev seed: demo@myhome.app / demo1234
+          </p>
+        )}
       </motion.div>
     </div>
   )
