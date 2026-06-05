@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
-import type { Budget, Expense, Income, Loan, LoanRepayment } from "@/lib/types"
+import type { Budget, Expense, Income, Loan, LoanAdvance, LoanRepayment } from "@/lib/types"
 import { requireGroupOwner } from "./_auth-guard"
 
 // ─── Budget ─────────────────────────────────────────────────────────────────
@@ -453,5 +453,53 @@ export async function deleteRepayment(id: string): Promise<{ success: boolean }>
   } catch (e) {
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false }
+  }
+}
+
+// ─── LoanAdvance ─────────────────────────────────────────────────────────────
+
+function serializeAdvance(a: Awaited<ReturnType<typeof prisma.loanAdvance.findFirst>>): LoanAdvance {
+  if (!a) throw new Error("LoanAdvance not found")
+  return {
+    id: a.id,
+    loanId: a.loanId,
+    amount: a.amount,
+    date: toDateStr(a.date),
+    note: a.note ?? undefined,
+    createdAt: toDateStr(a.createdAt),
+    updatedAt: toDateStr(a.updatedAt),
+  }
+}
+
+export async function getAdvancesByGroup(groupId: string): Promise<LoanAdvance[]> {
+  await requireGroupOwner(groupId)
+  const loans = await prisma.loan.findMany({ where: { groupId }, select: { id: true } })
+  const loanIds = loans.map((l) => l.id)
+  const items = await prisma.loanAdvance.findMany({
+    where: { loanId: { in: loanIds } },
+    orderBy: { date: "asc" },
+  })
+  return items.map(serializeAdvance)
+}
+
+export async function createAdvance(
+  data: Omit<LoanAdvance, "id" | "createdAt" | "updatedAt">,
+): Promise<{ success: true; data: LoanAdvance } | { success: false; error: string }> {
+  try {
+    const loan = await prisma.loan.findUnique({ where: { id: data.loanId }, select: { groupId: true } })
+    if (!loan) return { success: false, error: "Loan not found" }
+    await requireGroupOwner(loan.groupId)
+    const a = await prisma.loanAdvance.create({
+      data: {
+        loanId: data.loanId,
+        amount: data.amount,
+        date: new Date(data.date),
+        note: data.note ?? null,
+      },
+    })
+    return { success: true, data: serializeAdvance(a) }
+  } catch (e) {
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }

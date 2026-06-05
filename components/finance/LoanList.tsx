@@ -6,7 +6,7 @@ import { ChevronDown, Plus, X, User, Pencil, Trash2, ArrowUp, ArrowDown } from "
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { type Loan, type LoanRepayment } from "@/lib/types"
+import { type Loan, type LoanAdvance, type LoanRepayment } from "@/lib/types"
 
 const TODAY = new Date().toISOString().slice(0, 10)
 
@@ -28,14 +28,14 @@ const REP_SORT_OPTIONS: { key: RepSortKey; label: string }[] = [
   { key: "amount",    label: "Amount" },
 ]
 
-function calcOutstanding(loan: Loan, repayments: LoanRepayment[]) {
+function calcOutstanding(loan: Loan, repayments: LoanRepayment[], advances: LoanAdvance[]) {
   const days = Math.max(0, (new Date(TODAY).getTime() - new Date(loan.startDate).getTime()) / 86_400_000)
-  const interest = loan.principal * (loan.interestRate / 100) * (days / 365)
-  const totalRepaid = repayments
-    .filter((r) => r.loanId === loan.id)
-    .reduce((s, r) => s + r.amount, 0)
-  const outstanding = Math.max(0, loan.principal + interest - totalRepaid)
-  return { interest, outstanding, totalRepaid }
+  const totalAdvances = advances.filter((a) => a.loanId === loan.id).reduce((s, a) => s + a.amount, 0)
+  const totalLoan = loan.principal + totalAdvances
+  const interest = totalLoan * (loan.interestRate / 100) * (days / 365)
+  const totalRepaid = repayments.filter((r) => r.loanId === loan.id).reduce((s, r) => s + r.amount, 0)
+  const outstanding = Math.max(0, totalLoan + interest - totalRepaid)
+  return { interest, outstanding, totalRepaid, totalAdvances, totalLoan }
 }
 
 function getLoanStatus(loan: Loan, outstanding: number): LoanStatus {
@@ -58,13 +58,15 @@ const DIRECTION_STYLES = {
 interface LoanListProps {
   loans: Loan[]
   repayments: LoanRepayment[]
+  advances: LoanAdvance[]
   currency: string
   onAddRepayment: (rep: Omit<LoanRepayment, "id" | "createdAt" | "updatedAt">) => void
+  onAddAdvance: (adv: Omit<LoanAdvance, "id" | "createdAt" | "updatedAt">) => void
   onEdit: (loan: Loan) => void
   onDelete: (id: string) => void
 }
 
-export function LoanList({ loans, repayments, currency, onAddRepayment, onEdit, onDelete }: LoanListProps) {
+export function LoanList({ loans, repayments, advances, currency, onAddRepayment, onAddAdvance, onEdit, onDelete }: LoanListProps) {
   const [tab, setTab] = useState<Tab>("all")
   const [showSettled, setShowSettled] = useState(false)
   const [sortBy, setSortBy] = useState<LoanSortKey>("updatedAt")
@@ -73,18 +75,35 @@ export function LoanList({ loans, repayments, currency, onAddRepayment, onEdit, 
   const [repSortDir, setRepSortDir] = useState<"asc" | "desc">("desc")
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [repFormId, setRepFormId] = useState<string | null>(null)
+  const [advFormId, setAdvFormId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const [repAmount, setRepAmount] = useState("")
   const [repDate, setRepDate] = useState("")
   const [repNote, setRepNote] = useState("")
 
-  useEffect(() => { setRepDate(new Date().toISOString().slice(0, 10)) }, [])
+  const [advAmount, setAdvAmount] = useState("")
+  const [advDate, setAdvDate] = useState("")
+  const [advNote, setAdvNote] = useState("")
+
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    setRepDate(today)
+    setAdvDate(today)
+  }, [])
 
   function openRepForm(loanId: string) {
+    setAdvFormId(null)
     setRepFormId(loanId)
     setRepAmount("")
     setRepNote("")
+  }
+
+  function openAdvForm(loanId: string) {
+    setRepFormId(null)
+    setAdvFormId(loanId)
+    setAdvAmount("")
+    setAdvNote("")
   }
 
   function handleAddRepayment(e: React.FormEvent, loan: Loan) {
@@ -97,11 +116,21 @@ export function LoanList({ loans, repayments, currency, onAddRepayment, onEdit, 
     setRepNote("")
   }
 
+  function handleAddAdvance(e: React.FormEvent, loan: Loan) {
+    e.preventDefault()
+    const amount = parseFloat(advAmount)
+    if (!amount || amount <= 0 || !advDate) return
+    onAddAdvance({ loanId: loan.id, amount, date: advDate, ...(advNote.trim() ? { note: advNote.trim() } : {}) })
+    setAdvFormId(null)
+    setAdvAmount("")
+    setAdvNote("")
+  }
+
   const filtered = loans
     .map((loan) => {
-      const { interest, outstanding, totalRepaid } = calcOutstanding(loan, repayments)
+      const { interest, outstanding, totalRepaid, totalAdvances, totalLoan } = calcOutstanding(loan, repayments, advances)
       const status = getLoanStatus(loan, outstanding)
-      return { loan, interest, outstanding, totalRepaid, status }
+      return { loan, interest, outstanding, totalRepaid, totalAdvances, totalLoan, status }
     })
     .filter(({ loan, status }) => {
       if (tab !== "all" && loan.direction !== tab) return false
@@ -200,8 +229,9 @@ export function LoanList({ loans, repayments, currency, onAddRepayment, onEdit, 
       )}
 
       {/* Loan cards */}
-      {filtered.map(({ loan, interest, outstanding, totalRepaid, status }) => {
+      {filtered.map(({ loan, interest, outstanding, totalRepaid, totalAdvances, totalLoan, status }) => {
         const loanRepaymentList = repayments.filter((r) => r.loanId === loan.id)
+        const loanAdvanceList = advances.filter((a) => a.loanId === loan.id)
         const isExpanded = expandedId === loan.id
 
         return (
@@ -312,11 +342,17 @@ export function LoanList({ loans, repayments, currency, onAddRepayment, onEdit, 
                     <div className="px-4 pb-4 flex flex-col gap-4 border-t border-border/50 pt-4 bg-muted/20">
 
                       {/* Breakdown */}
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div>
                           <p className="text-xs text-muted-foreground mb-1">Principal</p>
                           <p className="font-semibold text-sm">{formatCurrency(loan.principal, currency)}</p>
                         </div>
+                        {totalAdvances > 0 && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Advances</p>
+                            <p className="font-semibold text-sm text-primary">{formatCurrency(totalAdvances, currency)}</p>
+                          </div>
+                        )}
                         <div>
                           <p className="text-xs text-muted-foreground mb-1">
                             Interest{loan.interestRate > 0 ? ` (${loan.interestRate}% p.a.)` : " (0%)"}
@@ -328,6 +364,13 @@ export function LoanList({ loans, repayments, currency, onAddRepayment, onEdit, 
                           <p className="font-semibold text-sm text-success">{formatCurrency(totalRepaid, currency)}</p>
                         </div>
                       </div>
+                      {totalAdvances > 0 && (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span>Total loan:</span>
+                          <span className="font-semibold text-foreground">{formatCurrency(totalLoan, currency)}</span>
+                          <span className="text-muted-foreground/60">({formatCurrency(loan.principal, currency)} + {formatCurrency(totalAdvances, currency)} advances)</span>
+                        </div>
+                      )}
 
                       {loan.notes && (
                         <p className="text-xs text-muted-foreground italic">&quot;{loan.notes}&quot;</p>
@@ -394,76 +437,177 @@ export function LoanList({ loans, repayments, currency, onAddRepayment, onEdit, 
                         </div>
                       )}
 
-                      {/* Add repayment */}
+                      {/* Advance history */}
+                      {loanAdvanceList.length > 0 && (
+                        <div className="flex flex-col gap-1.5">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Advances</p>
+                          <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/50 overflow-hidden">
+                            {[...loanAdvanceList]
+                              .sort((a, b) => (a.date < b.date ? -1 : 1))
+                              .map((a) => (
+                                <div key={a.id} className="flex items-center justify-between px-3 py-2 bg-background text-sm">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-xs text-muted-foreground">
+                                      {new Date(a.date).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+                                    </span>
+                                    {a.note && <span className="text-xs text-muted-foreground italic">{a.note}</span>}
+                                  </div>
+                                  <span className="font-medium text-primary text-sm">+{formatCurrency(a.amount, currency)}</span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Action buttons / inline forms */}
                       {status !== "settled" && (
-                        repFormId !== loan.id ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="gap-1.5 text-xs h-8 self-start"
-                            onClick={() => openRepForm(loan.id)}
-                          >
-                            <Plus className="size-3.5" />
-                            Add repayment
-                          </Button>
-                        ) : (
+                        <div className="flex flex-col gap-2">
+                          {/* Buttons row — only shown when neither form is open */}
+                          {repFormId !== loan.id && advFormId !== loan.id && (
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="gap-1.5 text-xs h-8"
+                                onClick={() => openRepForm(loan.id)}
+                              >
+                                <Plus className="size-3.5" />
+                                Add repayment
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="gap-1.5 text-xs h-8"
+                                onClick={() => openAdvForm(loan.id)}
+                              >
+                                <Plus className="size-3.5" />
+                                Add advance
+                              </Button>
+                            </div>
+                          )}
+
+                          {/* Repayment form */}
                           <AnimatePresence>
-                            <motion.form
-                              key="rep-form"
-                              initial={{ opacity: 0, y: -4 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0 }}
-                              transition={{ duration: 0.15 }}
-                              onSubmit={(e) => handleAddRepayment(e, loan)}
-                              className="flex flex-col gap-2"
-                            >
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-xs text-muted-foreground font-medium">Amount</label>
-                                  <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">{getCurrencySymbol(currency)}</span>
+                            {repFormId === loan.id && (
+                              <motion.form
+                                key="rep-form"
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.15 }}
+                                onSubmit={(e) => handleAddRepayment(e, loan)}
+                                className="flex flex-col gap-2"
+                              >
+                                <p className="text-xs font-medium text-muted-foreground">Add repayment</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="flex flex-col gap-1">
+                                    <label className="text-xs text-muted-foreground font-medium">Amount</label>
+                                    <div className="relative">
+                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">{getCurrencySymbol(currency)}</span>
+                                      <input
+                                        type="number"
+                                        min="0.01"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={repAmount}
+                                        onChange={(e) => setRepAmount(e.target.value)}
+                                        required
+                                        className="h-9 pl-7 pr-3 w-full rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <label className="text-xs text-muted-foreground font-medium">Date</label>
                                     <input
-                                      type="number"
-                                      min="0.01"
-                                      step="0.01"
-                                      placeholder="0.00"
-                                      value={repAmount}
-                                      onChange={(e) => setRepAmount(e.target.value)}
+                                      type="date"
+                                      value={repDate}
+                                      onChange={(e) => setRepDate(e.target.value)}
                                       required
-                                      className="h-9 pl-7 pr-3 w-full rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                      className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                                     />
                                   </div>
                                 </div>
                                 <div className="flex flex-col gap-1">
-                                  <label className="text-xs text-muted-foreground font-medium">Date</label>
+                                  <label className="text-xs text-muted-foreground font-medium">Note (optional)</label>
                                   <input
-                                    type="date"
-                                    value={repDate}
-                                    onChange={(e) => setRepDate(e.target.value)}
-                                    required
+                                    type="text"
+                                    placeholder="e.g. Partial payment"
+                                    value={repNote}
+                                    onChange={(e) => setRepNote(e.target.value)}
                                     className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                                   />
                                 </div>
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-xs text-muted-foreground font-medium">Note (optional)</label>
-                                <input
-                                  type="text"
-                                  placeholder="e.g. Partial payment"
-                                  value={repNote}
-                                  onChange={(e) => setRepNote(e.target.value)}
-                                  className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                                />
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Button type="submit" size="sm">Add repayment</Button>
-                                <Button type="button" size="sm" variant="ghost" onClick={() => setRepFormId(null)}>
-                                  <X className="size-3.5" />
-                                </Button>
-                              </div>
-                            </motion.form>
+                                <div className="flex items-center gap-2">
+                                  <Button type="submit" size="sm">Add repayment</Button>
+                                  <Button type="button" size="sm" variant="ghost" onClick={() => setRepFormId(null)}>
+                                    <X className="size-3.5" />
+                                  </Button>
+                                </div>
+                              </motion.form>
+                            )}
                           </AnimatePresence>
-                        )
+
+                          {/* Advance form */}
+                          <AnimatePresence>
+                            {advFormId === loan.id && (
+                              <motion.form
+                                key="adv-form"
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.15 }}
+                                onSubmit={(e) => handleAddAdvance(e, loan)}
+                                className="flex flex-col gap-2"
+                              >
+                                <p className="text-xs font-medium text-muted-foreground">Add advance</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="flex flex-col gap-1">
+                                    <label className="text-xs text-muted-foreground font-medium">Amount</label>
+                                    <div className="relative">
+                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">{getCurrencySymbol(currency)}</span>
+                                      <input
+                                        type="number"
+                                        min="0.01"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={advAmount}
+                                        onChange={(e) => setAdvAmount(e.target.value)}
+                                        required
+                                        className="h-9 pl-7 pr-3 w-full rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <label className="text-xs text-muted-foreground font-medium">Date</label>
+                                    <input
+                                      type="date"
+                                      value={advDate}
+                                      onChange={(e) => setAdvDate(e.target.value)}
+                                      required
+                                      className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-xs text-muted-foreground font-medium">Note (optional)</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. Extra funds for renovation"
+                                    value={advNote}
+                                    onChange={(e) => setAdvNote(e.target.value)}
+                                    className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button type="submit" size="sm">Add advance</Button>
+                                  <Button type="button" size="sm" variant="ghost" onClick={() => setAdvFormId(null)}>
+                                    <X className="size-3.5" />
+                                  </Button>
+                                </div>
+                              </motion.form>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       )}
                     </div>
                   </motion.div>
