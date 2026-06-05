@@ -168,7 +168,7 @@ export function NotesGrid({ data, onEdit, onDelete }: NotesGridProps) {
                 {onEdit && (
                   <button
                     onClick={() => onEdit(note)}
-                    className="flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                    className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
                     aria-label="Edit note"
                   >
                     <Pencil className="size-3" />
@@ -177,7 +177,7 @@ export function NotesGrid({ data, onEdit, onDelete }: NotesGridProps) {
                 {onDelete && (
                   <button
                     onClick={() => setDeleteId(note.id)}
-                    className="flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                     aria-label="Delete note"
                   >
                     <Trash2 className="size-3" />

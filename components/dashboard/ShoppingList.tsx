@@ -214,7 +214,7 @@ export function ShoppingList({ data, onEdit, onDelete }: ShoppingListProps) {
                         {onEdit && (
                           <button
                             onClick={() => onEdit(item)}
-                            className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                             aria-label="Edit item"
                           >
                             <Pencil className="size-3.5" />
@@ -223,7 +223,7 @@ export function ShoppingList({ data, onEdit, onDelete }: ShoppingListProps) {
                         {onDelete && (
                           <button
                             onClick={() => setDeleteId(item.id)}
-                            className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                             aria-label="Delete item"
                           >
                             <Trash2 className="size-3.5" />

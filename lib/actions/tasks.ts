@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
 import type { Task } from "@/lib/types"
+import { requireGroupOwner } from "./_auth-guard"
 
 function serialize(t: Awaited<ReturnType<typeof prisma.task.findFirst>>): Task {
   if (!t) throw new Error("Task not found")
@@ -22,6 +23,7 @@ function serialize(t: Awaited<ReturnType<typeof prisma.task.findFirst>>): Task {
 }
 
 export async function getTasks(groupId: string, eventId?: string): Promise<Task[]> {
+  await requireGroupOwner(groupId)
   const tasks = await prisma.task.findMany({
     where: eventId ? { eventId } : { groupId },
     orderBy: { updatedAt: "desc" },
@@ -33,6 +35,7 @@ export async function createTask(
   data: Omit<Task, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: Task } | { success: false; error: string }> {
   try {
+    await requireGroupOwner(data.groupId)
     const t = await prisma.task.create({
       data: {
         title: data.title,
@@ -47,7 +50,8 @@ export async function createTask(
     })
     return { success: true, data: serialize(t) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
@@ -56,6 +60,9 @@ export async function updateTask(
   data: Partial<Omit<Task, "id" | "createdAt" | "updatedAt">>,
 ): Promise<{ success: true; data: Task } | { success: false; error: string }> {
   try {
+    const existing = await prisma.task.findUnique({ where: { id }, select: { groupId: true } })
+    if (!existing) return { success: false, error: "Not found" }
+    await requireGroupOwner(existing.groupId)
     const t = await prisma.task.update({
       where: { id },
       data: {
@@ -66,13 +73,20 @@ export async function updateTask(
     })
     return { success: true, data: serialize(t) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
 export async function deleteTask(id: string): Promise<{ success: boolean }> {
   try {
+    const existing = await prisma.task.findUnique({ where: { id }, select: { groupId: true } })
+    if (!existing) return { success: false }
+    await requireGroupOwner(existing.groupId)
     await prisma.task.delete({ where: { id } })
     return { success: true }
-  } catch { return { success: false } }
+  } catch (e) {
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false }
+  }
 }

@@ -61,13 +61,13 @@ export function EventsManager() {
 
   const { data: groups = [] } = useQuery<Group[]>({
     queryKey: ["groups", userId],
-    queryFn: () => getGroups(userId),
+    queryFn: () => getGroups(),
     enabled: !!userId,
   })
 
   const { data: events = [] } = useQuery<AppEvent[]>({
     queryKey: ["events", userId],
-    queryFn: () => getEventsByUser(userId),
+    queryFn: () => getEventsByUser(),
     enabled: !!userId,
   })
 

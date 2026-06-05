@@ -252,21 +252,29 @@ export function BudgetList() {
               <div className="rounded-xl border border-border/60 bg-muted/30 p-4 mb-4 flex flex-col gap-3">
                 <p className="text-sm font-medium">{editingId ? "Edit Budget" : "New Budget"}</p>
 
-                <input
-                  type="text"
-                  placeholder="Budget name"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="border border-input rounded-lg px-3 py-2 text-sm bg-background w-full focus:outline-none focus:ring-2 focus:ring-ring"
-                />
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="budget-name" className="text-xs text-muted-foreground font-medium">Name</label>
+                  <input
+                    id="budget-name"
+                    type="text"
+                    placeholder="Budget name"
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    className="border border-input rounded-lg px-3 py-2 text-sm bg-background w-full focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
 
-                <select
-                  value={form.category}
-                  onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                  className="border border-input rounded-lg px-3 py-2 text-sm bg-background w-full focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="budget-category" className="text-xs text-muted-foreground font-medium">Category</label>
+                  <select
+                    id="budget-category"
+                    value={form.category}
+                    onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                    className="border border-input rounded-lg px-3 py-2 text-sm bg-background w-full focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
 
                 <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
                   {(["monthly", "yearly"] as const).map((t) => (
@@ -285,21 +293,26 @@ export function BudgetList() {
                   ))}
                 </div>
 
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{getCurrencySymbol(currency)}</span>
-                  <input
-                    type="number"
-                    placeholder="0.00"
-                    value={form.amount}
-                    onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                    className="border border-input rounded-lg pl-7 pr-3 py-2 text-sm bg-background w-full focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="budget-amount" className="text-xs text-muted-foreground font-medium">Amount</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{getCurrencySymbol(currency)}</span>
+                    <input
+                      id="budget-amount"
+                      type="number"
+                      placeholder="0.00"
+                      value={form.amount}
+                      onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                      className="border border-input rounded-lg pl-7 pr-3 py-2 text-sm bg-background w-full focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
                 </div>
 
                 {groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
+                    <label htmlFor="budget-event" className="text-xs text-muted-foreground font-medium">Event (optional)</label>
                     <select
+                      id="budget-event"
                       value={form.eventId}
                       onChange={(e) => setForm((f) => ({ ...f, eventId: e.target.value }))}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -388,14 +401,14 @@ export function BudgetList() {
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => openEdit(b)}
-                                className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                                 aria-label="Edit budget"
                               >
                                 <Pencil className="size-3.5" />
                               </button>
                               <button
                                 onClick={() => setDeleteId(b.id)}
-                                className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                                 aria-label="Delete budget"
                               >
                                 <Trash2 className="size-3.5" />

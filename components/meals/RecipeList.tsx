@@ -367,7 +367,7 @@ export function RecipeList({ data, onSave, onDelete }: RecipeListProps) {
                                   {onSave && (
                                     <button
                                       onClick={() => openEdit(recipe)}
-                                      className="flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                      className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                                       aria-label="Edit recipe"
                                     >
                                       <Pencil className="size-3" />
@@ -376,7 +376,7 @@ export function RecipeList({ data, onSave, onDelete }: RecipeListProps) {
                                   {onDelete && (
                                     <button
                                       onClick={() => setDeleteId(recipe.id)}
-                                      className="flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                      className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                                       aria-label="Delete recipe"
                                     >
                                       <Trash2 className="size-3" />

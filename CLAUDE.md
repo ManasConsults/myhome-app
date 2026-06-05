@@ -16,7 +16,7 @@ Auth.js v5 (next-auth@beta) — CredentialsProvider + JWT session strategy.
 - **Secret:** `AUTH_SECRET` env var — 32-byte hex string. Required in `.env.local`, Vercel env vars, and GitHub Actions secrets.
 - **Password hashing:** bcryptjs, cost factor 12. Legacy plaintext passwords are re-hashed on first login (handled in `authorize()` in `auth.ts`).
 - **Auth config:** `auth.ts` (project root) — exports `handlers`, `auth`, `signIn`, `signOut`. CredentialsProvider `authorize()` validates credentials and checks `status === "active"`.
-- **Route protection:** `proxy.ts` (project root) — wraps Auth.js `auth()` middleware. Public paths: `/login`, `/register`. Admin paths require `session.user.role === "admin"`.
+- **Route protection:** `proxy.ts` (project root) — wraps Auth.js `auth()` middleware. Public paths: `/login`, `/register`. Admin paths require `session.user.role === "admin"`. **Important:** `proxy.ts` only protects page navigation — it does NOT protect Server Action invocations. Every server action must enforce auth internally (see Server Action Security below).
 - **Session server-side:** `auth()` from `@/auth` — use in Server Components and server actions.
 - **Session client-side:** `useSession()` from `next-auth/react` — wrapped by `useAuth()` shim in `components/providers/AuthProvider.tsx`.
 - **`useAuth()`** returns `{ user: AuthUser | null, logout }`. `AuthUser = { id, name, email, role }`. No `setUser` — Auth.js manages session state.
@@ -112,6 +112,15 @@ oklch hue-based presets. `applyThemeColor()` in `lib/theme-colors.ts` sets CSS v
 - Icons inside `Button` — no size classes, use `data-icon` attribute
 - Conditional classes — always `cn()`, never template literal ternaries
 - Animations — Framer Motion only (`motion.*`, `variants`, `AnimatePresence`)
+- Page-height containers — `min-h-dvh`, never `min-h-screen` (dvh accounts for mobile browser chrome)
+
+### Accessibility requirements
+
+- **Form labels** — every `<label>` must have `htmlFor` matching the input's `id`. Placeholder-only inputs are not acceptable.
+- **Error messages** — animated/conditional error `<p>` elements must have `role="alert"` so screen readers announce them.
+- **Icon-only buttons** — any `<button>` or `<Button>` with no visible text must have `aria-label` describing the action (e.g. `aria-label="Close navigation"`, `aria-label="Delete budget"`).
+- **Inline action buttons** (edit/delete in list rows) — use `size-8` minimum. These are below the 44px ideal but maintain density; the surrounding row padding provides additional touch area.
+- **`prefers-reduced-motion`** — `MotionConfig reducedMotion="user"` is set globally in `ThemeProvider`. No per-component handling needed — Framer Motion respects it automatically.
 
 ### Card elevation standard
 
@@ -182,6 +191,30 @@ All shell chrome (header bar, sidebar, sidebar logo bar) floats off screen edges
 - **Avoid waterfalls** — use `Promise.all`, Suspense boundaries, or preload pattern
 - **No Zustand / Jotai** — React Context for shared UI state, TanStack Query for server state
 
+### Server Action Security
+
+Every server action must verify the caller's identity and ownership. Use the helpers in `lib/actions/_auth-guard.ts`:
+
+```ts
+import { requireSession, requireGroupOwner } from "./_auth-guard"
+
+// Any authenticated user — use for unscoped data (e.g. recipes)
+await requireSession()
+
+// Verify caller owns the group — use for all group-scoped data
+await requireGroupOwner(groupId)
+
+// For delete/update by record ID — look up the record first
+const existing = await prisma.task.findUnique({ where: { id }, select: { groupId: true } })
+if (!existing) return { success: false }
+await requireGroupOwner(existing.groupId)
+```
+
+- `requireGroupOwner` calls `requireSession` internally — no need to call both
+- For admin-only actions, call `requireAdmin()` (defined in `lib/actions/auth.ts`) — applies to `getUsers`, `approveUser`, `rejectUser`, `updateUserRole`, `deleteUser`
+- **Never return raw error strings** — use `"Something went wrong"` in catch blocks; re-throw `"Unauthenticated"` and `"Forbidden"` so Next.js handles them as non-200 responses
+- `getGroups()` and `getEventsByUser()` take no userId parameter — they derive it from the server session. Never pass userId from the client to scope these queries.
+
 ### Groups + Events — `GroupProvider` + `useGroup()`
 
 The **active group** (household) is the primary scope — set from the sidebar GroupSwitcher. Within each feature page, the user can additionally filter by an **event** using an inline `EventFilter` bar. This event filter is global state scoped to the active group's events.
@@ -219,8 +252,8 @@ const [eventId, setEventId] = useState(activeEvent?.id ?? "")
 
 {groupEvents.length > 0 && (
   <div className="flex flex-col gap-1">
-    <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
-    <select value={eventId} onChange={e => setEventId(e.target.value)}
+    <label htmlFor="event-select" className="text-xs text-muted-foreground font-medium">Event (optional)</label>
+    <select id="event-select" value={eventId} onChange={e => setEventId(e.target.value)}
       className="h-9 px-3 rounded-lg border border-border bg-background text-sm ...">
       <option value="">No event</option>
       {groupEvents.map(ev => (
@@ -305,6 +338,8 @@ lib/
   utils.ts              # cn() and shared utilities
   validations/          # Zod schemas (shared between forms + server actions)
   db/prisma.ts          # Prisma client singleton
+  actions/
+    _auth-guard.ts      # requireSession() + requireGroupOwner() — import in every action file
 proxy.ts                # Route protection (Next.js 16 — replaces middleware.ts)
 ```
 

@@ -1,6 +1,7 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
+import { timingSafeEqual } from "crypto"
 import { prisma } from "@/lib/db/prisma"
 import type { UserRole } from "@/lib/session"
 
@@ -16,7 +17,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const stored = user.password ?? ""
         const isPlaintext = !stored.startsWith("$2")
         const valid = isPlaintext
-          ? stored === password
+          ? stored.length === password.length &&
+            timingSafeEqual(Buffer.from(stored), Buffer.from(password))
           : await bcrypt.compare(password, stored)
         if (!valid) return null
 

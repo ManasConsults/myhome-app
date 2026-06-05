@@ -227,7 +227,7 @@ export function TaskList({ data, onEdit, onDelete }: TaskListProps) {
                           {onEdit && (
                             <button
                               onClick={() => onEdit(task)}
-                              className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                              className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                               aria-label="Edit task"
                             >
                               <Pencil className="size-3.5" />
@@ -236,7 +236,7 @@ export function TaskList({ data, onEdit, onDelete }: TaskListProps) {
                           {onDelete && (
                             <button
                               onClick={() => setDeleteId(task.id)}
-                              className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                              className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                               aria-label="Delete task"
                             >
                               <Trash2 className="size-3.5" />

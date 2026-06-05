@@ -48,7 +48,7 @@ export function GroupsManager() {
 
   const { data: groups = [] } = useQuery({
     queryKey: ["groups", userId],
-    queryFn: () => getGroups(userId),
+    queryFn: () => getGroups(),
     enabled: !!userId,
   })
 

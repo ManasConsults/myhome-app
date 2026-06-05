@@ -529,14 +529,14 @@ export function IncomeList() {
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => openEdit(income)}
-                            className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                             aria-label="Edit income"
                           >
                             <Pencil className="size-3.5" />
                           </button>
                           <button
                             onClick={() => setDeleteId(income.id)}
-                            className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                             aria-label="Delete income"
                           >
                             <Trash2 className="size-3.5" />

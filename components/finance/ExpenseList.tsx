@@ -551,14 +551,14 @@ export function ExpenseList() {
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => openEdit(expense)}
-                            className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                             aria-label="Edit expense"
                           >
                             <Pencil className="size-3.5" />
                           </button>
                           <button
                             onClick={() => setDeleteId(expense.id)}
-                            className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                             aria-label="Delete expense"
                           >
                             <Trash2 className="size-3.5" />

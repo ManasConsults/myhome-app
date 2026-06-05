@@ -124,7 +124,7 @@ export default function AdminDataPage() {
 
   const { data: groups = [] } = useQuery<Group[]>({
     queryKey: ["groups", userId],
-    queryFn: () => getGroups(userId),
+    queryFn: () => getGroups(),
     enabled: !!userId,
   })
 

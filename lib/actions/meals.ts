@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
 import type { Recipe, DayMeals } from "@/lib/types"
+import { requireSession, requireGroupOwner } from "./_auth-guard"
 
 // ─── Recipe ──────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,7 @@ function serializeRecipe(r: Awaited<ReturnType<typeof prisma.recipe.findFirst>>)
 }
 
 export async function getRecipes(): Promise<Recipe[]> {
+  await requireSession()
   const items = await prisma.recipe.findMany({ orderBy: { name: "asc" } })
   return items.map(serializeRecipe)
 }
@@ -31,6 +33,7 @@ export async function createRecipe(
   data: Omit<Recipe, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: Recipe } | { success: false; error: string }> {
   try {
+    await requireSession()
     const r = await prisma.recipe.create({
       data: {
         name: data.name,
@@ -44,7 +47,8 @@ export async function createRecipe(
     })
     return { success: true, data: serializeRecipe(r) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
@@ -53,18 +57,24 @@ export async function updateRecipe(
   data: Partial<Omit<Recipe, "id" | "createdAt" | "updatedAt">>,
 ): Promise<{ success: true; data: Recipe } | { success: false; error: string }> {
   try {
+    await requireSession()
     const r = await prisma.recipe.update({ where: { id }, data })
     return { success: true, data: serializeRecipe(r) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
 export async function deleteRecipe(id: string): Promise<{ success: boolean }> {
   try {
+    await requireSession()
     await prisma.recipe.delete({ where: { id } })
     return { success: true }
-  } catch { return { success: false } }
+  } catch (e) {
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false }
+  }
 }
 
 // ─── DayMeals ────────────────────────────────────────────────────────────────
@@ -84,6 +94,7 @@ function serializeDayMeals(d: Awaited<ReturnType<typeof prisma.dayMeals.findFirs
 }
 
 export async function getMealPlan(groupId: string, eventId?: string): Promise<DayMeals[]> {
+  await requireGroupOwner(groupId)
   const items = await prisma.dayMeals.findMany({
     where: eventId ? { eventId } : { groupId },
     orderBy: { day: "asc" },
@@ -95,6 +106,7 @@ export async function upsertDayMeals(
   data: Omit<DayMeals, "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: DayMeals } | { success: false; error: string }> {
   try {
+    await requireGroupOwner(data.groupId)
     // Postgres treats NULL != NULL in unique constraints, so upsert doesn't work
     // when eventId is null — must use findFirst + conditional create/update instead
     const existing = await prisma.dayMeals.findFirst({
@@ -122,12 +134,14 @@ export async function upsertDayMeals(
 
     return { success: true, data: serializeDayMeals(result) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
 export async function deleteDayMeals(groupId: string, day: string, eventId?: string): Promise<{ success: boolean }> {
   try {
+    await requireGroupOwner(groupId)
     const existing = await prisma.dayMeals.findFirst({
       where: eventId
         ? { groupId, eventId, day }
@@ -137,5 +151,8 @@ export async function deleteDayMeals(groupId: string, day: string, eventId?: str
       await prisma.dayMeals.delete({ where: { id: existing.id } })
     }
     return { success: true }
-  } catch { return { success: false } }
+  } catch (e) {
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false }
+  }
 }

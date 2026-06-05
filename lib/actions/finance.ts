@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
 import type { Budget, Expense, Income, Loan, LoanRepayment } from "@/lib/types"
+import { requireGroupOwner } from "./_auth-guard"
 
 // ─── Budget ─────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,7 @@ function serializeBudget(b: Awaited<ReturnType<typeof prisma.budget.findFirst>>)
 }
 
 export async function getBudgets(groupId: string, eventId?: string): Promise<Budget[]> {
+  await requireGroupOwner(groupId)
   const items = await prisma.budget.findMany({
     where: eventId ? { eventId } : { groupId },
     orderBy: { updatedAt: "desc" },
@@ -38,6 +40,7 @@ export async function createBudget(
   data: Omit<Budget, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: Budget } | { success: false; error: string }> {
   try {
+    await requireGroupOwner(data.groupId)
     const b = await prisma.budget.create({
       data: {
         name: data.name,
@@ -55,7 +58,8 @@ export async function createBudget(
     })
     return { success: true, data: serializeBudget(b) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
@@ -64,6 +68,9 @@ export async function updateBudget(
   data: Partial<Omit<Budget, "id" | "createdAt" | "updatedAt">>,
 ): Promise<{ success: true; data: Budget } | { success: false; error: string }> {
   try {
+    const existing = await prisma.budget.findUnique({ where: { id }, select: { groupId: true } })
+    if (!existing) return { success: false, error: "Not found" }
+    await requireGroupOwner(existing.groupId)
     const b = await prisma.budget.update({
       where: { id },
       data: {
@@ -74,15 +81,22 @@ export async function updateBudget(
     })
     return { success: true, data: serializeBudget(b) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
 export async function deleteBudget(id: string): Promise<{ success: boolean }> {
   try {
+    const existing = await prisma.budget.findUnique({ where: { id }, select: { groupId: true } })
+    if (!existing) return { success: false }
+    await requireGroupOwner(existing.groupId)
     await prisma.budget.delete({ where: { id } })
     return { success: true }
-  } catch { return { success: false } }
+  } catch (e) {
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false }
+  }
 }
 
 // ─── Expense ─────────────────────────────────────────────────────────────────
@@ -108,6 +122,7 @@ function serializeExpense(e: Awaited<ReturnType<typeof prisma.expense.findFirst>
 }
 
 export async function getExpenses(groupId: string, eventId?: string): Promise<Expense[]> {
+  await requireGroupOwner(groupId)
   const items = await prisma.expense.findMany({
     where: eventId ? { eventId } : { groupId },
     orderBy: { date: "desc" },
@@ -119,6 +134,7 @@ export async function createExpense(
   data: Omit<Expense, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: Expense } | { success: false; error: string }> {
   try {
+    await requireGroupOwner(data.groupId)
     const e = await prisma.expense.create({
       data: {
         title: data.title,
@@ -136,7 +152,8 @@ export async function createExpense(
     })
     return { success: true, data: serializeExpense(e) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
@@ -145,6 +162,9 @@ export async function updateExpense(
   data: Partial<Omit<Expense, "id" | "createdAt" | "updatedAt">>,
 ): Promise<{ success: true; data: Expense } | { success: false; error: string }> {
   try {
+    const existing = await prisma.expense.findUnique({ where: { id }, select: { groupId: true } })
+    if (!existing) return { success: false, error: "Not found" }
+    await requireGroupOwner(existing.groupId)
     const e = await prisma.expense.update({
       where: { id },
       data: {
@@ -158,15 +178,22 @@ export async function updateExpense(
     })
     return { success: true, data: serializeExpense(e) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
 export async function deleteExpense(id: string): Promise<{ success: boolean }> {
   try {
+    const existing = await prisma.expense.findUnique({ where: { id }, select: { groupId: true } })
+    if (!existing) return { success: false }
+    await requireGroupOwner(existing.groupId)
     await prisma.expense.delete({ where: { id } })
     return { success: true }
-  } catch { return { success: false } }
+  } catch (e) {
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false }
+  }
 }
 
 // ─── Income ──────────────────────────────────────────────────────────────────
@@ -191,6 +218,7 @@ function serializeIncome(i: Awaited<ReturnType<typeof prisma.income.findFirst>>)
 }
 
 export async function getIncomes(groupId: string, eventId?: string): Promise<Income[]> {
+  await requireGroupOwner(groupId)
   const items = await prisma.income.findMany({
     where: eventId ? { eventId } : { groupId },
     orderBy: { date: "desc" },
@@ -202,6 +230,7 @@ export async function createIncome(
   data: Omit<Income, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: Income } | { success: false; error: string }> {
   try {
+    await requireGroupOwner(data.groupId)
     const i = await prisma.income.create({
       data: {
         title: data.title,
@@ -218,7 +247,8 @@ export async function createIncome(
     })
     return { success: true, data: serializeIncome(i) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
@@ -227,6 +257,9 @@ export async function updateIncome(
   data: Partial<Omit<Income, "id" | "createdAt" | "updatedAt">>,
 ): Promise<{ success: true; data: Income } | { success: false; error: string }> {
   try {
+    const existing = await prisma.income.findUnique({ where: { id }, select: { groupId: true } })
+    if (!existing) return { success: false, error: "Not found" }
+    await requireGroupOwner(existing.groupId)
     const i = await prisma.income.update({
       where: { id },
       data: {
@@ -239,15 +272,22 @@ export async function updateIncome(
     })
     return { success: true, data: serializeIncome(i) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
 export async function deleteIncome(id: string): Promise<{ success: boolean }> {
   try {
+    const existing = await prisma.income.findUnique({ where: { id }, select: { groupId: true } })
+    if (!existing) return { success: false }
+    await requireGroupOwner(existing.groupId)
     await prisma.income.delete({ where: { id } })
     return { success: true }
-  } catch { return { success: false } }
+  } catch (e) {
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false }
+  }
 }
 
 // ─── Loan ────────────────────────────────────────────────────────────────────
@@ -271,6 +311,7 @@ function serializeLoan(l: Awaited<ReturnType<typeof prisma.loan.findFirst>>): Lo
 }
 
 export async function getLoans(groupId: string, eventId?: string): Promise<Loan[]> {
+  await requireGroupOwner(groupId)
   const items = await prisma.loan.findMany({
     where: eventId ? { eventId } : { groupId },
     orderBy: { startDate: "desc" },
@@ -282,6 +323,7 @@ export async function createLoan(
   data: Omit<Loan, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: Loan } | { success: false; error: string }> {
   try {
+    await requireGroupOwner(data.groupId)
     const l = await prisma.loan.create({
       data: {
         direction: data.direction,
@@ -297,7 +339,8 @@ export async function createLoan(
     })
     return { success: true, data: serializeLoan(l) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
@@ -306,6 +349,9 @@ export async function updateLoan(
   data: Partial<Omit<Loan, "id" | "createdAt" | "updatedAt">>,
 ): Promise<{ success: true; data: Loan } | { success: false; error: string }> {
   try {
+    const existing = await prisma.loan.findUnique({ where: { id }, select: { groupId: true } })
+    if (!existing) return { success: false, error: "Not found" }
+    await requireGroupOwner(existing.groupId)
     const l = await prisma.loan.update({
       where: { id },
       data: {
@@ -318,15 +364,22 @@ export async function updateLoan(
     })
     return { success: true, data: serializeLoan(l) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
 export async function deleteLoan(id: string): Promise<{ success: boolean }> {
   try {
+    const existing = await prisma.loan.findUnique({ where: { id }, select: { groupId: true } })
+    if (!existing) return { success: false }
+    await requireGroupOwner(existing.groupId)
     await prisma.loan.delete({ where: { id } })
     return { success: true }
-  } catch { return { success: false } }
+  } catch (e) {
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false }
+  }
 }
 
 // ─── LoanRepayment ───────────────────────────────────────────────────────────
@@ -345,6 +398,9 @@ function serializeRepayment(r: Awaited<ReturnType<typeof prisma.loanRepayment.fi
 }
 
 export async function getRepayments(loanId: string): Promise<LoanRepayment[]> {
+  const loan = await prisma.loan.findUnique({ where: { id: loanId }, select: { groupId: true } })
+  if (!loan) return []
+  await requireGroupOwner(loan.groupId)
   const items = await prisma.loanRepayment.findMany({
     where: { loanId },
     orderBy: { date: "asc" },
@@ -353,6 +409,7 @@ export async function getRepayments(loanId: string): Promise<LoanRepayment[]> {
 }
 
 export async function getRepaymentsByGroup(groupId: string): Promise<LoanRepayment[]> {
+  await requireGroupOwner(groupId)
   const loans = await prisma.loan.findMany({ where: { groupId }, select: { id: true } })
   const loanIds = loans.map((l) => l.id)
   const items = await prisma.loanRepayment.findMany({
@@ -366,6 +423,9 @@ export async function createRepayment(
   data: Omit<LoanRepayment, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: LoanRepayment } | { success: false; error: string }> {
   try {
+    const loan = await prisma.loan.findUnique({ where: { id: data.loanId }, select: { groupId: true } })
+    if (!loan) return { success: false, error: "Loan not found" }
+    await requireGroupOwner(loan.groupId)
     const r = await prisma.loanRepayment.create({
       data: {
         loanId: data.loanId,
@@ -376,13 +436,22 @@ export async function createRepayment(
     })
     return { success: true, data: serializeRepayment(r) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
 export async function deleteRepayment(id: string): Promise<{ success: boolean }> {
   try {
+    const repayment = await prisma.loanRepayment.findUnique({ where: { id }, select: { loanId: true } })
+    if (!repayment) return { success: false }
+    const loan = await prisma.loan.findUnique({ where: { id: repayment.loanId }, select: { groupId: true } })
+    if (!loan) return { success: false }
+    await requireGroupOwner(loan.groupId)
     await prisma.loanRepayment.delete({ where: { id } })
     return { success: true }
-  } catch { return { success: false } }
+  } catch (e) {
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false }
+  }
 }

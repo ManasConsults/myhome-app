@@ -199,8 +199,9 @@ export function TasksSection() {
               <div className="p-4 flex flex-col gap-3 border-b border-border/60">
                 <p className="text-sm font-medium">{editingId ? "Edit task" : "New task"}</p>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-muted-foreground font-medium">Title</label>
+                  <label htmlFor="task-title" className="text-xs text-muted-foreground font-medium">Title</label>
                   <input
+                    id="task-title"
                     type="text"
                     placeholder="e.g. Fix leaking tap"
                     value={title}
@@ -212,8 +213,9 @@ export function TasksSection() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Category</label>
+                    <label htmlFor="task-category" className="text-xs text-muted-foreground font-medium">Category</label>
                     <select
+                      id="task-category"
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -222,8 +224,9 @@ export function TasksSection() {
                     </select>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Priority</label>
+                    <label htmlFor="task-priority" className="text-xs text-muted-foreground font-medium">Priority</label>
                     <select
+                      id="task-priority"
                       value={priority}
                       onChange={(e) => setPriority(e.target.value as "high" | "medium" | "low")}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -236,8 +239,9 @@ export function TasksSection() {
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-muted-foreground font-medium">Due date</label>
+                  <label htmlFor="task-due" className="text-xs text-muted-foreground font-medium">Due date</label>
                   <input
+                    id="task-due"
                     type="date"
                     value={due}
                     onChange={(e) => setDue(e.target.value)}
@@ -248,8 +252,9 @@ export function TasksSection() {
 
                 {groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
+                    <label htmlFor="task-event" className="text-xs text-muted-foreground font-medium">Event (optional)</label>
                     <select
+                      id="task-event"
                       value={eventId}
                       onChange={(e) => setEventId(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"

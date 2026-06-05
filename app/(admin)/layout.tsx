@@ -17,10 +17,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [session, status, router])
 
   // Render a blank shell while auth hydrates — proxy.ts is the real gate
-  if (status === "loading") return <div className="flex flex-col min-h-screen" />
+  if (status === "loading") return <div className="flex flex-col min-h-dvh" />
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-dvh">
       {children}
     </div>
   )

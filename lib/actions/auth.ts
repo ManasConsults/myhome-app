@@ -1,6 +1,7 @@
 "use server"
 
 import bcrypt from "bcryptjs"
+import { auth } from "@/auth"
 import { prisma } from "@/lib/db/prisma"
 import type { UserRole, UserStatus } from "@/lib/session"
 
@@ -15,6 +16,12 @@ export type UserRecord = {
 
 function isSeedUser(user: { email: string }) {
   return user.email === "demo@myhome.app"
+}
+
+async function requireAdmin() {
+  const session = await auth()
+  if (!session || session.user.role !== "admin") throw new Error("Forbidden")
+  return session
 }
 
 export async function getLoginBlockReason(email: string): Promise<string | null> {
@@ -34,7 +41,6 @@ export async function registerAction(data: {
   if (existing) return { success: false, error: "An account with this email already exists." }
 
   const hashed = await bcrypt.hash(data.password, 12)
-  // First user ever becomes the admin and is immediately active — bootstraps an empty deployment
   const isFirstUser = (await prisma.user.count()) === 0
 
   const user = await prisma.user.create({
@@ -64,6 +70,7 @@ export async function registerAction(data: {
 }
 
 export async function getUsers(): Promise<UserRecord[]> {
+  await requireAdmin()
   const users = await prisma.user.findMany({ orderBy: { createdAt: "asc" } })
   return users.map((u) => ({
     id: u.id,
@@ -76,6 +83,7 @@ export async function getUsers(): Promise<UserRecord[]> {
 }
 
 export async function approveUser(userId: string): Promise<{ success: boolean }> {
+  await requireAdmin()
   try {
     await prisma.user.update({ where: { id: userId }, data: { status: "active" } })
     return { success: true }
@@ -83,6 +91,7 @@ export async function approveUser(userId: string): Promise<{ success: boolean }>
 }
 
 export async function rejectUser(userId: string): Promise<{ success: boolean }> {
+  await requireAdmin()
   try {
     await prisma.user.update({ where: { id: userId }, data: { status: "rejected" } })
     return { success: true }
@@ -90,6 +99,7 @@ export async function rejectUser(userId: string): Promise<{ success: boolean }> 
 }
 
 export async function updateUserRole(userId: string, role: UserRole): Promise<{ success: boolean }> {
+  await requireAdmin()
   try {
     const user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user || isSeedUser(user)) return { success: false }
@@ -99,6 +109,7 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<{ 
 }
 
 export async function deleteUser(userId: string): Promise<{ success: boolean }> {
+  await requireAdmin()
   try {
     const user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user || isSeedUser(user)) return { success: false }

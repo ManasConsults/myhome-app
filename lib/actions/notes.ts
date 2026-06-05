@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
 import type { Note } from "@/lib/types"
+import { requireGroupOwner } from "./_auth-guard"
 
 function serialize(n: Awaited<ReturnType<typeof prisma.note.findFirst>>): Note {
   if (!n) throw new Error("Note not found")
@@ -21,6 +22,7 @@ function serialize(n: Awaited<ReturnType<typeof prisma.note.findFirst>>): Note {
 }
 
 export async function getNotes(groupId: string, eventId?: string): Promise<Note[]> {
+  await requireGroupOwner(groupId)
   const notes = await prisma.note.findMany({
     where: eventId ? { eventId } : { groupId },
     orderBy: [{ pinned: "desc" }, { updatedAt: "desc" }],
@@ -32,6 +34,7 @@ export async function createNote(
   data: Omit<Note, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: Note } | { success: false; error: string }> {
   try {
+    await requireGroupOwner(data.groupId)
     const n = await prisma.note.create({
       data: {
         title: data.title,
@@ -45,7 +48,8 @@ export async function createNote(
     })
     return { success: true, data: serialize(n) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
@@ -54,19 +58,29 @@ export async function updateNote(
   data: Partial<Omit<Note, "id" | "createdAt" | "updatedAt">>,
 ): Promise<{ success: true; data: Note } | { success: false; error: string }> {
   try {
+    const existing = await prisma.note.findUnique({ where: { id }, select: { groupId: true } })
+    if (!existing) return { success: false, error: "Not found" }
+    await requireGroupOwner(existing.groupId)
     const n = await prisma.note.update({
       where: { id },
       data: { ...data, eventId: data.eventId ?? null },
     })
     return { success: true, data: serialize(n) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
 export async function deleteNote(id: string): Promise<{ success: boolean }> {
   try {
+    const existing = await prisma.note.findUnique({ where: { id }, select: { groupId: true } })
+    if (!existing) return { success: false }
+    await requireGroupOwner(existing.groupId)
     await prisma.note.delete({ where: { id } })
     return { success: true }
-  } catch { return { success: false } }
+  } catch (e) {
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false }
+  }
 }

@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
 import type { AppEvent } from "@/lib/types"
+import { requireSession, requireGroupOwner } from "./_auth-guard"
 
 function serialize(e: Awaited<ReturnType<typeof prisma.appEvent.findFirst>>): AppEvent {
   if (!e) throw new Error("Event not found")
@@ -20,8 +21,12 @@ function serialize(e: Awaited<ReturnType<typeof prisma.appEvent.findFirst>>): Ap
   }
 }
 
-export async function getEventsByUser(userId: string): Promise<AppEvent[]> {
-  const groups = await prisma.group.findMany({ where: { userId }, select: { id: true } })
+export async function getEventsByUser(): Promise<AppEvent[]> {
+  const session = await requireSession()
+  const groups = await prisma.group.findMany({
+    where: { userId: session.user.id },
+    select: { id: true },
+  })
   const groupIds = groups.map((g) => g.id)
   const events = await prisma.appEvent.findMany({
     where: { groupId: { in: groupIds } },
@@ -31,6 +36,7 @@ export async function getEventsByUser(userId: string): Promise<AppEvent[]> {
 }
 
 export async function getEvents(groupId: string): Promise<AppEvent[]> {
+  await requireGroupOwner(groupId)
   const events = await prisma.appEvent.findMany({
     where: { groupId },
     orderBy: { startDate: "asc" },
@@ -42,6 +48,7 @@ export async function createEvent(
   data: Omit<AppEvent, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: AppEvent } | { success: false; error: string }> {
   try {
+    await requireGroupOwner(data.groupId)
     const e = await prisma.appEvent.create({
       data: {
         groupId: data.groupId,
@@ -55,7 +62,8 @@ export async function createEvent(
     })
     return { success: true, data: serialize(e) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
@@ -64,6 +72,9 @@ export async function updateEvent(
   data: Partial<Omit<AppEvent, "id" | "createdAt" | "updatedAt">>,
 ): Promise<{ success: true; data: AppEvent } | { success: false; error: string }> {
   try {
+    const existing = await prisma.appEvent.findUnique({ where: { id }, select: { groupId: true } })
+    if (!existing) return { success: false, error: "Not found" }
+    await requireGroupOwner(existing.groupId)
     const e = await prisma.appEvent.update({
       where: { id },
       data: {
@@ -74,15 +85,20 @@ export async function updateEvent(
     })
     return { success: true, data: serialize(e) }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }
 
 export async function deleteEvent(id: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const existing = await prisma.appEvent.findUnique({ where: { id }, select: { groupId: true } })
+    if (!existing) return { success: false, error: "Not found" }
+    await requireGroupOwner(existing.groupId)
     await prisma.appEvent.delete({ where: { id } })
     return { success: true }
   } catch (e) {
-    return { success: false, error: String(e) }
+    if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
+    return { success: false, error: "Something went wrong" }
   }
 }

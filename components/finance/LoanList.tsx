@@ -271,7 +271,7 @@ export function LoanList({ loans, repayments, currency, onAddRepayment, onEdit, 
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onEdit(loan) }}
-                        className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                         aria-label="Edit loan"
                       >
                         <Pencil className="size-3.5" />
@@ -279,7 +279,7 @@ export function LoanList({ loans, repayments, currency, onAddRepayment, onEdit, 
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setDeleteId(loan.id) }}
-                        className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                         aria-label="Delete loan"
                       >
                         <Trash2 className="size-3.5" />

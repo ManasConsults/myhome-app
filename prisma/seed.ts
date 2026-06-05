@@ -7,6 +7,11 @@ const prisma = new PrismaClient({ adapter })
 
 function d(s: string): Date { return new Date(s) }
 
+if (process.env.NODE_ENV === "production") {
+  console.error("Seed must not be run in production")
+  process.exit(1)
+}
+
 async function main() {
   // ── Users ──────────────────────────────────────────────────────────────────
   const hashedPassword = await bcrypt.hash("demo1234", 12)

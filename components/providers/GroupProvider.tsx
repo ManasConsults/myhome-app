@@ -26,13 +26,13 @@ export function GroupProvider({ children }: { children: ReactNode }) {
 
   const { data: groups = [], isPending: groupsPending } = useQuery({
     queryKey: ["groups", userId],
-    queryFn: () => getGroups(userId),
+    queryFn: () => getGroups(),
     enabled: !!userId,
   })
 
   const { data: events = [] } = useQuery({
     queryKey: ["events", userId],
-    queryFn: () => getEventsByUser(userId),
+    queryFn: () => getEventsByUser(),
     enabled: !!userId,
   })
 

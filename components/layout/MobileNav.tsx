@@ -138,7 +138,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
                   <span className="text-[10px] text-sidebar-foreground/40 font-medium tracking-widest uppercase">Household</span>
                 </div>
               </div>
-              <button onClick={onClose} className="text-sidebar-foreground/60 hover:text-sidebar-foreground p-1">
+              <button onClick={onClose} aria-label="Close navigation" className="text-sidebar-foreground/60 hover:text-sidebar-foreground p-1">
                 <X className="size-5" />
               </button>
             </div>
