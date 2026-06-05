@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Settings, LogOut, User, ShieldCheck } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/providers/AuthProvider"
@@ -58,6 +58,7 @@ export function ProfileDropdown() {
         className="rounded-full ring-2 ring-transparent hover:ring-primary/40 transition-all focus:outline-none focus:ring-primary/40"
       >
         <Avatar className="size-8">
+          {user?.image && <AvatarImage src={user.image} alt={displayName} />}
           <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
             {initials}
           </AvatarFallback>
@@ -76,6 +77,7 @@ export function ProfileDropdown() {
             {/* Profile header */}
             <div className="px-4 py-4 flex items-start gap-3">
               <Avatar className="size-10 shrink-0 mt-0.5">
+                {user?.image && <AvatarImage src={user.image} alt={displayName} />}
                 <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
                   {initials}
                 </AvatarFallback>

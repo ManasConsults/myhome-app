@@ -22,17 +22,32 @@ export function applyThemeColor(color: ThemeColor, isDark: boolean): void {
   const { h } = color
 
   if (isDark) {
-    root.style.setProperty("--primary",          `oklch(0.65 0.20 ${h})`)
-    root.style.setProperty("--ring",             `oklch(0.65 0.20 ${h})`)
-    root.style.setProperty("--sidebar-primary",  `oklch(0.65 0.20 ${h})`)
-    root.style.setProperty("--sidebar-ring",     `oklch(0.65 0.20 ${h})`)
-    root.style.setProperty("--chart-1",          `oklch(0.65 0.20 ${h})`)
+    root.style.setProperty("--primary",                    `oklch(0.65 0.20 ${h})`)
+    root.style.setProperty("--ring",                       `oklch(0.65 0.20 ${h})`)
+    root.style.setProperty("--secondary",                  `oklch(0.22 0.04 ${h})`)
+    root.style.setProperty("--accent",                     `oklch(0.25 0.06 ${h})`)
+    root.style.setProperty("--sidebar",                    `oklch(0.14 0.03 ${h})`)
+    root.style.setProperty("--sidebar-foreground",         `oklch(0.92 0.02 ${h})`)
+    root.style.setProperty("--sidebar-primary",            `oklch(0.65 0.20 ${h})`)
+    root.style.setProperty("--sidebar-ring",               `oklch(0.65 0.20 ${h})`)
+    root.style.setProperty("--sidebar-accent",             `oklch(0.22 0.05 ${h})`)
+    root.style.setProperty("--sidebar-accent-foreground",  `oklch(0.92 0.02 ${h})`)
+    root.style.setProperty("--chart-1",                    `oklch(0.65 0.20 ${h})`)
   } else {
-    root.style.setProperty("--primary",          `oklch(0.52 0.22 ${h})`)
-    root.style.setProperty("--ring",             `oklch(0.52 0.22 ${h})`)
-    root.style.setProperty("--sidebar-primary",  `oklch(0.65 0.18 ${h})`)
-    root.style.setProperty("--sidebar-ring",     `oklch(0.52 0.22 ${h})`)
-    root.style.setProperty("--chart-1",          `oklch(0.52 0.22 ${h})`)
+    root.style.setProperty("--primary",                    `oklch(0.52 0.22 ${h})`)
+    root.style.setProperty("--ring",                       `oklch(0.52 0.22 ${h})`)
+    root.style.setProperty("--secondary",                  `oklch(0.94 0.02 ${h})`)
+    root.style.setProperty("--secondary-foreground",       `oklch(0.3 0.05 ${h})`)
+    root.style.setProperty("--accent",                     `oklch(0.94 0.04 ${h})`)
+    root.style.setProperty("--accent-foreground",          `oklch(0.3 0.1 ${h})`)
+    root.style.setProperty("--sidebar",                    `oklch(0.18 0.04 ${h})`)
+    root.style.setProperty("--sidebar-foreground",         `oklch(0.92 0.02 ${h})`)
+    root.style.setProperty("--sidebar-primary",            `oklch(0.65 0.18 ${h})`)
+    root.style.setProperty("--sidebar-ring",               `oklch(0.52 0.22 ${h})`)
+    root.style.setProperty("--sidebar-accent",             `oklch(0.26 0.05 ${h})`)
+    root.style.setProperty("--sidebar-accent-foreground",  `oklch(0.92 0.02 ${h})`)
+    root.style.setProperty("--sidebar-border",             `oklch(0.28 0.04 ${h})`)
+    root.style.setProperty("--chart-1",                    `oklch(0.52 0.22 ${h})`)
   }
 }
 

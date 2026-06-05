@@ -125,6 +125,16 @@ export type Loan = {
   updatedAt: string
 }
 
+export type LoanAdvance = {
+  id: string
+  loanId: string
+  amount: number
+  date: string
+  note?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type LoanRepayment = {
   id: string
   loanId: string

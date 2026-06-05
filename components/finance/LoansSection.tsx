@@ -6,19 +6,21 @@ import { Plus, X, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2 } from "
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { type Loan, type LoanRepayment } from "@/lib/types"
+import { type Loan, type LoanAdvance, type LoanRepayment } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { LoanList } from "@/components/finance/LoanList"
 import { EventFilter } from "@/components/ui/EventFilter"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getLoans, createLoan, updateLoan, deleteLoan, getRepaymentsByGroup, createRepayment } from "@/lib/actions/finance"
+import { getLoans, createLoan, updateLoan, deleteLoan, getRepaymentsByGroup, createRepayment, getAdvancesByGroup, createAdvance } from "@/lib/actions/finance"
 
-function calcOutstanding(loan: Loan, repayments: LoanRepayment[]) {
+function calcOutstanding(loan: Loan, repayments: LoanRepayment[], advances: LoanAdvance[]) {
   const today = new Date().toISOString().slice(0, 10)
   const days = Math.max(0, (new Date(today).getTime() - new Date(loan.startDate).getTime()) / 86_400_000)
-  const interest = loan.principal * (loan.interestRate / 100) * (days / 365)
+  const totalAdvances = advances.filter((a) => a.loanId === loan.id).reduce((s, a) => s + a.amount, 0)
+  const totalLoan = loan.principal + totalAdvances
+  const interest = totalLoan * (loan.interestRate / 100) * (days / 365)
   const totalRepaid = repayments.filter((r) => r.loanId === loan.id).reduce((s, r) => s + r.amount, 0)
-  return Math.max(0, loan.principal + interest - totalRepaid)
+  return Math.max(0, totalLoan + interest - totalRepaid)
 }
 
 function isOverdue(loan: Loan, outstanding: number) {
@@ -57,8 +59,14 @@ export function LoansSection() {
     queryFn: () => getRepaymentsByGroup(activeGroup.id),
   })
 
+  const { data: advances = [] } = useQuery({
+    queryKey: ["advances", activeGroup.id],
+    queryFn: () => getAdvancesByGroup(activeGroup.id),
+  })
+
   const invalidateLoans = () => queryClient.invalidateQueries({ queryKey: ["loans", activeGroup.id] })
   const invalidateRepayments = () => queryClient.invalidateQueries({ queryKey: ["repayments", activeGroup.id] })
+  const invalidateAdvances = () => queryClient.invalidateQueries({ queryKey: ["advances", activeGroup.id] })
 
   const createMutation = useMutation({ mutationFn: createLoan, onSuccess: invalidateLoans })
   const updateMutation = useMutation({
@@ -68,24 +76,25 @@ export function LoansSection() {
   })
   const deleteMutation = useMutation({
     mutationFn: deleteLoan,
-    onSuccess: () => { invalidateLoans(); invalidateRepayments() },
+    onSuccess: () => { invalidateLoans(); invalidateRepayments(); invalidateAdvances() },
   })
   const repaymentMutation = useMutation({ mutationFn: createRepayment, onSuccess: invalidateRepayments })
+  const advanceMutation = useMutation({ mutationFn: createAdvance, onSuccess: invalidateAdvances })
 
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 
   // Stats
   const lentOutstanding = loanList
     .filter((l) => l.direction === "lent")
-    .reduce((s, l) => s + calcOutstanding(l, repayments), 0)
+    .reduce((s, l) => s + calcOutstanding(l, repayments, advances), 0)
 
   const borrowedOutstanding = loanList
     .filter((l) => l.direction === "borrowed")
-    .reduce((s, l) => s + calcOutstanding(l, repayments), 0)
+    .reduce((s, l) => s + calcOutstanding(l, repayments, advances), 0)
 
-  const overdueCount = loanList.filter((l) => isOverdue(l, calcOutstanding(l, repayments))).length
+  const overdueCount = loanList.filter((l) => isOverdue(l, calcOutstanding(l, repayments, advances))).length
 
-  const settledCount = loanList.filter((l) => calcOutstanding(l, repayments) === 0).length
+  const settledCount = loanList.filter((l) => calcOutstanding(l, repayments, advances) === 0).length
 
   const statsData = [
     { label: "Lent Out",     value: formatCurrency(lentOutstanding, currency, 0),     icon: TrendingUp,    color: "text-primary",     bg: "bg-primary/10" },
@@ -165,6 +174,10 @@ export function LoansSection() {
 
   async function handleAddRepayment(rep: Omit<LoanRepayment, "id" | "createdAt" | "updatedAt">) {
     await repaymentMutation.mutateAsync(rep)
+  }
+
+  async function handleAddAdvance(adv: Omit<LoanAdvance, "id" | "createdAt" | "updatedAt">) {
+    await advanceMutation.mutateAsync(adv)
   }
 
   return (
@@ -357,8 +370,10 @@ export function LoansSection() {
       <LoanList
         loans={loanList}
         repayments={repayments}
+        advances={advances}
         currency={currency}
         onAddRepayment={handleAddRepayment}
+        onAddAdvance={handleAddAdvance}
         onEdit={openEdit}
         onDelete={handleDelete}
       />

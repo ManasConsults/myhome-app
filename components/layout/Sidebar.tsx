@@ -9,8 +9,6 @@ import {
   Wallet,
   CheckSquare,
   ShoppingCart,
-  Home,
-  Settings,
   CalendarDays,
   StickyNote,
   UtensilsCrossed,
@@ -19,8 +17,7 @@ import {
   Banknote,
   HandCoins,
   ChevronDown,
-  User,
-  Database,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -51,12 +48,6 @@ const navItems: NavItem[] = [
   { href: "/meals", label: "Meals", icon: UtensilsCrossed },
 ]
 
-const BASE_SETTINGS_SUB: SubItem[] = [
-  { href: "/settings/profile", label: "Profile", icon: User },
-  { href: "/settings/groups", label: "Groups", icon: Home },
-  { href: "/settings/events", label: "Events", icon: CalendarDays },
-]
-
 const STORAGE_KEY = "myhome-nav-expanded"
 
 function defaultExpanded(items: NavItem[]): Record<string, boolean> {
@@ -69,19 +60,9 @@ export function Sidebar() {
   const pathname = usePathname()
   const { user } = useAuth()
 
-  const bottomItems: NavItem[] = [
-    {
-      href: "/settings",
-      label: "Settings",
-      icon: Settings,
-      subItems: [
-        ...BASE_SETTINGS_SUB,
-        ...(user?.role === "admin"
-          ? [{ href: "/settings/reference-data", label: "Reference Data", icon: Database }]
-          : []),
-      ],
-    },
-  ]
+  const bottomItems: NavItem[] = user?.role === "admin"
+    ? [{ href: "/settings/reference-data", label: "Admin", icon: ShieldCheck }]
+    : []
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     defaultExpanded([...navItems, ...bottomItems])
@@ -254,10 +235,12 @@ export function Sidebar() {
         {navItems.map(renderNavItem)}
       </nav>
 
-      {/* Bottom */}
-      <div className="px-3 py-4 border-t border-sidebar-border flex flex-col gap-0.5">
-        {bottomItems.map(renderNavItem)}
-      </div>
+      {/* Bottom — admin only */}
+      {bottomItems.length > 0 && (
+        <div className="px-3 py-4 border-t border-sidebar-border flex flex-col gap-0.5">
+          {bottomItems.map(renderNavItem)}
+        </div>
+      )}
     </aside>
   )
 }

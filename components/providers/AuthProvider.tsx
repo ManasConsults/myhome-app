@@ -8,6 +8,7 @@ export type AuthUser = {
   name: string
   email: string
   role: UserRole
+  image?: string | null
 }
 
 export function useAuth() {
@@ -18,6 +19,7 @@ export function useAuth() {
         name: session.user.name ?? "",
         email: session.user.email ?? "",
         role: session.user.role,
+        image: session.user.image,
       }
     : null
 

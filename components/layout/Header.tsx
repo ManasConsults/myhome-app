@@ -1,15 +1,14 @@
 "use client"
 
-import { useTheme } from "next-themes"
-import { Sun, Moon, Bell, Menu } from "lucide-react"
+import { Bell, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MobileNav } from "./MobileNav"
 import { GlobalSearch } from "./GlobalSearch"
 import { ProfileDropdown } from "./ProfileDropdown"
+import { ThemeQuickPicker } from "./ThemeQuickPicker"
 import { useState } from "react"
 
 export function Header({ title }: { title: string }) {
-  const { theme, setTheme } = useTheme()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   return (
@@ -38,16 +37,7 @@ export function Header({ title }: { title: string }) {
           {/* Right — actions */}
           <div className="flex items-center gap-1 shrink-0">
             {/* Mobile search icon is rendered inside GlobalSearch itself */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <Sun className="rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-              <Moon className="absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            </Button>
+            <ThemeQuickPicker />
 
             <Button variant="ghost" size="icon" aria-label="Notifications" className="text-muted-foreground hover:text-foreground relative">
               <Bell />
