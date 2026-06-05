@@ -91,6 +91,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     session({ session, token }) {
       session.user.id = token.sub!
       session.user.role = token.role as UserRole
+      session.user.image = (token.picture as string | null | undefined) ?? null
       return session
     },
   },
