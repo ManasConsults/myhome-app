@@ -1,25 +1,17 @@
 "use client"
 
-import { type CalendarEvent } from "@/lib/types"
+import { type CalendarEvent, type Category } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
-function getDotColor(category: string): string {
-  switch (category) {
-    case "appointment":
-      return "bg-primary"
-    case "reminder":
-      return "bg-warning"
-    case "birthday":
-    case "holiday":
-      return "bg-success"
-    case "social":
-      return "bg-muted-foreground"
-    default:
-      return "bg-muted-foreground"
-  }
+const COLOR_DOT_CLASSES: Record<string, string> = {
+  primary: "bg-primary",
+  success: "bg-success",
+  warning: "bg-warning",
+  destructive: "bg-destructive",
+  muted: "bg-muted-foreground",
 }
 
 function getCalendarMeta(year: number, month: number) {
@@ -28,7 +20,8 @@ function getCalendarMeta(year: number, month: number) {
   return { firstDay, totalDays }
 }
 
-export function CalendarGrid({ data }: { data: CalendarEvent[] }) {
+export function CalendarGrid({ data, categories }: { data: CalendarEvent[]; categories: Category[] }) {
+  const dotColorMap = Object.fromEntries(categories.map((c) => [c.name, c.color]))
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth()
@@ -104,7 +97,7 @@ export function CalendarGrid({ data }: { data: CalendarEvent[] }) {
                             {dots.map((e) => (
                               <span
                                 key={e.id}
-                                className={cn("size-1 rounded-full", getDotColor(e.category))}
+                                className={cn("size-1 rounded-full", COLOR_DOT_CLASSES[dotColorMap[e.category]] ?? "bg-muted-foreground")}
                               />
                             ))}
                           </div>

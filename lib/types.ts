@@ -1,3 +1,23 @@
+export type CategoryDomain =
+  | "expense"
+  | "income"
+  | "task"
+  | "shopping"
+  | "note"
+  | "calendar"
+  | "meal_tag"
+
+export type Category = {
+  id: string
+  domain: CategoryDomain
+  name: string
+  icon: string
+  color: string
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
 export type Group = {
   id: string
   name: string
@@ -136,7 +156,7 @@ export type CalendarEvent = {
   title: string
   date: string
   time?: string
-  category: "appointment" | "birthday" | "holiday" | "reminder" | "social"
+  category: string
   allDay: boolean
   icon: string
   groupId: string

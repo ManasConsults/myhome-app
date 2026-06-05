@@ -3,10 +3,12 @@ import { Header } from "@/components/layout/Header"
 import { BudgetStats } from "@/components/finance/BudgetStats"
 import { BudgetList } from "@/components/finance/BudgetList"
 import { TransactionList } from "@/components/dashboard/TransactionList"
+import { getCategories } from "@/lib/actions/categories"
 
 export const metadata: Metadata = { title: "Budgets" }
 
-export default function BudgetsPage() {
+export default async function BudgetsPage() {
+  const expenseCategories = await getCategories("expense")
   return (
     <>
       <Header title="Budgets" />
@@ -14,7 +16,7 @@ export default function BudgetsPage() {
         <BudgetStats />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5">
           <div className="lg:col-span-2">
-            <BudgetList />
+            <BudgetList expenseCategories={expenseCategories} />
           </div>
           <TransactionList />
         </div>

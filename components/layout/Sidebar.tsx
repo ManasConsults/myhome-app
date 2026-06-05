@@ -20,11 +20,13 @@ import {
   HandCoins,
   ChevronDown,
   User,
+  Database,
   type LucideIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ScopeSwitcher } from "./ScopeSwitcher"
 import { AppLogoMark } from "@/components/ui/AppLogo"
+import { useAuth } from "@/components/providers/AuthProvider"
 
 type SubItem = { href: string; label: string; icon: LucideIcon }
 type NavItem  = { href: string; label: string; icon: LucideIcon; subItems?: SubItem[] }
@@ -49,17 +51,10 @@ const navItems: NavItem[] = [
   { href: "/meals", label: "Meals", icon: UtensilsCrossed },
 ]
 
-const bottomItems: NavItem[] = [
-  {
-    href: "/settings",
-    label: "Settings",
-    icon: Settings,
-    subItems: [
-      { href: "/settings/profile", label: "Profile", icon: User },
-      { href: "/settings/groups", label: "Groups", icon: Home },
-      { href: "/settings/events", label: "Events", icon: CalendarDays },
-    ],
-  },
+const BASE_SETTINGS_SUB: SubItem[] = [
+  { href: "/settings/profile", label: "Profile", icon: User },
+  { href: "/settings/groups", label: "Groups", icon: Home },
+  { href: "/settings/events", label: "Events", icon: CalendarDays },
 ]
 
 const STORAGE_KEY = "myhome-nav-expanded"
@@ -72,6 +67,22 @@ function defaultExpanded(items: NavItem[]): Record<string, boolean> {
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { user } = useAuth()
+
+  const bottomItems: NavItem[] = [
+    {
+      href: "/settings",
+      label: "Settings",
+      icon: Settings,
+      subItems: [
+        ...BASE_SETTINGS_SUB,
+        ...(user?.role === "admin"
+          ? [{ href: "/settings/reference-data", label: "Reference Data", icon: Database }]
+          : []),
+      ],
+    },
+  ]
+
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     defaultExpanded([...navItems, ...bottomItems])
   )
@@ -81,6 +92,8 @@ export function Sidebar() {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) setExpanded({ ...defaultExpanded([...navItems, ...bottomItems]), ...JSON.parse(stored) })
     } catch {}
+  // bottomItems ref changes every render — only hydrate once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Auto-expand parent when navigating directly to a sub-route

@@ -34,9 +34,10 @@ interface RecipeListProps {
   data?: Recipe[]
   onSave?: (recipe: Recipe) => void
   onDelete?: (id: string) => void
+  suggestedTags?: string[]
 }
 
-export function RecipeList({ data, onSave, onDelete }: RecipeListProps) {
+export function RecipeList({ data, onSave, onDelete, suggestedTags = [] }: RecipeListProps) {
   const formCardRef = useRef<HTMLDivElement>(null)
   const source = data ?? []
 
@@ -290,6 +291,34 @@ export function RecipeList({ data, onSave, onDelete }: RecipeListProps) {
                   onChange={(e) => setTagsInput(e.target.value)}
                   className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
+                {suggestedTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {suggestedTags.map((tag) => {
+                      const active = tagsInput.split(",").map((t) => t.trim()).includes(tag)
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => {
+                            const current = tagsInput.split(",").map((t) => t.trim()).filter(Boolean)
+                            const next = active
+                              ? current.filter((t) => t !== tag)
+                              : [...current, tag]
+                            setTagsInput(next.join(", "))
+                          }}
+                          className={cn(
+                            "px-2 py-0.5 rounded-full text-xs border transition-colors",
+                            active
+                              ? "bg-primary/10 border-primary/30 text-primary"
+                              : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                          )}
+                        >
+                          {tag}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2 justify-end">

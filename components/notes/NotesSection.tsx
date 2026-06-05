@@ -6,14 +6,12 @@ import { Plus, X, FileText, Pin, Tag, Clock } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { type Note } from "@/lib/types"
+import { type Note, type Category } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { NotesGrid } from "@/components/notes/NotesGrid"
 import { EventFilter } from "@/components/ui/EventFilter"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { getNotes, createNote, updateNote, deleteNote } from "@/lib/actions/notes"
-
-const CATEGORIES = ["General", "Home", "Finance", "Health", "Work", "Personal", "Shopping", "Travel", "Other"]
 
 const COLORS: { value: Note["color"]; label: string }[] = [
   { value: "default", label: "Default" },
@@ -23,7 +21,7 @@ const COLORS: { value: Note["color"]; label: string }[] = [
   { value: "rose",    label: "Rose" },
 ]
 
-export function NotesSection() {
+export function NotesSection({ categories }: { categories: Category[] }) {
   const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
   const queryClient = useQueryClient()
 
@@ -33,7 +31,7 @@ export function NotesSection() {
 
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
-  const [category, setCategory] = useState("General")
+  const [category, setCategory] = useState(() => categories[0]?.name ?? "")
   const [color, setColor] = useState<Note["color"]>("default")
   const [pinned, setPinned] = useState(false)
   const [eventId, setEventId] = useState("")
@@ -75,7 +73,7 @@ export function NotesSection() {
   function resetForm() {
     setTitle("")
     setContent("")
-    setCategory("General")
+    setCategory(categories[0]?.name ?? "")
     setColor("default")
     setPinned(false)
     setEventId(activeEvent?.id ?? "")
@@ -230,7 +228,7 @@ export function NotesSection() {
                       onChange={(e) => setCategory(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                     >
-                      {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                      {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
                   </div>
                   <div className="flex flex-col gap-1">

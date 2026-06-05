@@ -6,7 +6,7 @@ import { Plus, X, RefreshCw, Calendar, Pencil, Trash2, ArrowUp, ArrowDown } from
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { type Income } from "@/lib/types"
+import { type Income, type Category } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { EventFilter } from "@/components/ui/EventFilter"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -23,16 +23,6 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "amount", label: "Amount" },
 ]
 
-const CATEGORIES = [
-  "Salary",
-  "Freelance",
-  "Rental Income",
-  "Investment",
-  "Business Income",
-  "Government Benefits",
-  "Gift",
-  "Other",
-]
 
 const FREQUENCY_OPTIONS: { value: Frequency; label: string }[] = [
   { value: "weekly", label: "Weekly" },
@@ -69,17 +59,6 @@ function computeNextDate(date: string, frequency: Frequency): string {
   return d.toISOString().slice(0, 10)
 }
 
-const CATEGORY_ICONS: Record<string, string> = {
-  Salary: "💼",
-  Freelance: "💻",
-  "Rental Income": "🏠",
-  Investment: "📈",
-  "Business Income": "🤝",
-  "Government Benefits": "🏛️",
-  Gift: "🎁",
-  Other: "💰",
-}
-
 const itemVariants = {
   hidden: { opacity: 0, y: 8 },
   visible: (i: number) => ({
@@ -90,7 +69,8 @@ const itemVariants = {
   exit: { opacity: 0, y: -6, transition: { duration: 0.15 } },
 }
 
-export function IncomeList() {
+export function IncomeList({ incomeCategories }: { incomeCategories: Category[] }) {
+  const iconMap = Object.fromEntries(incomeCategories.map((c) => [c.name, c.icon]))
   const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
   const queryClient = useQueryClient()
   const currency = activeGroup.currency
@@ -120,7 +100,7 @@ export function IncomeList() {
 
   const [title, setTitle] = useState("")
   const [amount, setAmount] = useState("")
-  const [category, setCategory] = useState(CATEGORIES[0])
+  const [category, setCategory] = useState(() => incomeCategories[0]?.name ?? "")
   const [date, setDate] = useState("")
   useEffect(() => { setDate(new Date().toISOString().slice(0, 10)) }, [])
   const [recurring, setRecurring] = useState(false)
@@ -150,7 +130,7 @@ export function IncomeList() {
   function resetForm() {
     setTitle("")
     setAmount("")
-    setCategory(CATEGORIES[0])
+    setCategory(incomeCategories[0]?.name ?? "")
     setDate(new Date().toISOString().slice(0, 10))
     setRecurring(false)
     setFrequency("monthly")
@@ -193,7 +173,7 @@ export function IncomeList() {
       title: title.trim(),
       amount: parsed,
       category,
-      icon: CATEGORY_ICONS[category] ?? "💰",
+      icon: iconMap[category] ?? "💰",
       date,
       recurring,
       ...(eventId ? { eventId } : { eventId: undefined }),
@@ -354,8 +334,8 @@ export function IncomeList() {
                       onChange={(e) => setCategory(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                     >
-                      {CATEGORIES.map((c) => (
-                        <option key={c} value={c}>{c}</option>
+                      {incomeCategories.map((c) => (
+                        <option key={c.id} value={c.name}>{c.icon ? `${c.icon} ` : ""}{c.name}</option>
                       ))}
                     </select>
                   </div>

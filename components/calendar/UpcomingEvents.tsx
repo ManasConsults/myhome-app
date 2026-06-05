@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { type CalendarEvent } from "@/lib/types"
+import { type CalendarEvent, type Category } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CalendarDays, ArrowUp, ArrowDown } from "lucide-react"
@@ -27,26 +27,18 @@ function formatEventDate(date: string, time?: string): string {
   return `${month} ${day} · ${hour}:${mins} ${period}`
 }
 
-function getCategoryBadgeClass(category: CalendarEvent["category"]): string {
-  switch (category) {
-    case "appointment":
-      return "bg-primary/10 text-primary border-primary/20"
-    case "birthday":
-      return "bg-destructive/10 text-destructive border-destructive/20"
-    case "holiday":
-      return "bg-success/10 text-success border-success/20"
-    case "reminder":
-      return "bg-warning/10 text-warning border-warning/20"
-    case "social":
-      return "bg-primary/10 text-primary border-primary/20"
-  }
+const BADGE_CLASSES: Record<string, string> = {
+  primary:     "bg-primary/10 text-primary border-primary/20",
+  success:     "bg-success/10 text-success border-success/20",
+  warning:     "bg-warning/10 text-warning border-warning/20",
+  destructive: "bg-destructive/10 text-destructive border-destructive/20",
+  muted:       "bg-muted text-muted-foreground border-border",
 }
 
-function getCategoryLabel(category: CalendarEvent["category"]): string {
-  return category.charAt(0).toUpperCase() + category.slice(1)
-}
-
-export function UpcomingEvents({ data }: { data: CalendarEvent[] }) {
+export function UpcomingEvents({ data, categories }: { data: CalendarEvent[]; categories: Category[] }) {
+  const badgeClassMap = Object.fromEntries(
+    categories.map((c) => [c.name, BADGE_CLASSES[c.color] ?? BADGE_CLASSES.muted])
+  )
   const [sortBy, setSortBy] = useState<SortKey>("date")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
 
@@ -118,9 +110,9 @@ export function UpcomingEvents({ data }: { data: CalendarEvent[] }) {
               </div>
               <Badge
                 variant="outline"
-                className={`text-xs shrink-0 ${getCategoryBadgeClass(event.category)}`}
+                className={`text-xs shrink-0 ${badgeClassMap[event.category] ?? BADGE_CLASSES.muted}`}
               >
-                {getCategoryLabel(event.category)}
+                {event.category.charAt(0).toUpperCase() + event.category.slice(1)}
               </Badge>
             </div>
           ))}

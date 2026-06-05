@@ -29,6 +29,7 @@ export async function getLoginBlockReason(email: string): Promise<string | null>
   if (!user) return null
   if (user.status === "pending") return "Your account is awaiting admin approval."
   if (user.status === "rejected") return "Your account request was not approved. Contact the admin."
+  if (!user.password) return "This email is registered via GitHub. Please sign in with GitHub instead."
   return null
 }
 
