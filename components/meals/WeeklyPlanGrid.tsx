@@ -2,30 +2,29 @@
 
 import { useState } from "react"
 import { Pencil, Trash2, UtensilsCrossed } from "lucide-react"
-import { weeklyMealPlan, recipes, type DayMeals } from "@/lib/dummy-data"
+import { type DayMeals, type Recipe } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-
-function getRecipe(id: string) {
-  return recipes.find((r) => r.id === id) ?? null
-}
 
 const MEAL_LABELS = ["Breakfast", "Lunch", "Dinner"] as const
 type MealKey = "breakfast" | "lunch" | "dinner"
 const MEAL_KEYS: MealKey[] = ["breakfast", "lunch", "dinner"]
 
-// Today is Monday (Apr 1, 2026)
-const TODAY_DAY = "Mon"
+const TODAY_DAY = new Date().toLocaleDateString("en-US", { weekday: "short" }).slice(0, 3)
 
 interface WeeklyPlanGridProps {
-  data?: DayMeals[]
+  data: DayMeals[]
+  recipes: Recipe[]
   onEdit?: (day: string, mealKey: MealKey, recipeId: string) => void
   onDelete?: (day: string, mealKey: MealKey) => void
 }
 
-export function WeeklyPlanGrid({ data, onEdit, onDelete }: WeeklyPlanGridProps) {
-  const source = data ?? weeklyMealPlan
+export function WeeklyPlanGrid({ data, recipes, onEdit, onDelete }: WeeklyPlanGridProps) {
   const [deleteSlot, setDeleteSlot] = useState<{ day: string; mealKey: MealKey } | null>(null)
+
+  function getRecipe(id: string) {
+    return recipes.find((r) => r.id === id) ?? null
+  }
 
   function renderSlot(dayPlan: DayMeals, key: MealKey) {
     const recipeId = dayPlan[key]
@@ -103,7 +102,7 @@ export function WeeklyPlanGrid({ data, onEdit, onDelete }: WeeklyPlanGridProps) 
       <CardContent className="px-5 pb-5">
         {/* Desktop: 7-col grid */}
         <div className="hidden md:grid grid-cols-7 gap-2">
-          {source.map((dayPlan) => {
+          {data.map((dayPlan) => {
             const isToday = dayPlan.day === TODAY_DAY
             return (
               <div key={dayPlan.day} className="flex flex-col gap-1.5">
@@ -123,7 +122,7 @@ export function WeeklyPlanGrid({ data, onEdit, onDelete }: WeeklyPlanGridProps) 
 
         {/* Mobile: vertical list */}
         <div className="flex flex-col gap-3 md:hidden">
-          {source.map((dayPlan) => {
+          {data.map((dayPlan) => {
             const isToday = dayPlan.day === TODAY_DAY
             return (
               <div key={dayPlan.day} className="border border-border/40 rounded-lg p-3 flex flex-col gap-2">

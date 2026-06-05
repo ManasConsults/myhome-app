@@ -1,38 +1,54 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AppLogoMark } from "@/components/ui/AppLogo"
-import { useAuth } from "@/components/providers/AuthProvider"
-import { findUser } from "@/lib/dummy-users"
+import { getLoginBlockReason } from "@/lib/actions/auth"
 
-export default function LoginPage() {
-  const { setUser } = useAuth()
-  const router = useRouter()
+function LoginForm() {
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
-  function handleSubmit(e: React.FormEvent) {
+  // Auth.js v5 redirects to /login?error=CredentialsSignin on failed credentials
+  useEffect(() => {
+    if (searchParams.get("error")) {
+      setError("Invalid email or password.")
+    }
+  }, [searchParams])
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError("")
+    setLoading(true)
 
-    const user = findUser(email, password)
-    if (!user) {
+    const blockReason = await getLoginBlockReason(email)
+    if (blockReason) {
+      setError(blockReason)
+      setLoading(false)
+      return
+    }
+
+    const result = await signIn("credentials", { email, password, redirect: false })
+    setLoading(false)
+
+    if (!result?.ok || result?.error) {
       setError("Invalid email or password.")
       return
     }
 
-    setUser({ userId: user.id, name: user.name, email: user.email, role: user.role })
-    router.push("/")
+    window.location.href = "/"
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-background flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -51,8 +67,9 @@ export default function LoginPage() {
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Email</label>
+                <label htmlFor="email" className="text-sm font-medium">Email</label>
                 <input
+                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -64,8 +81,9 @@ export default function LoginPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Password</label>
+                <label htmlFor="password" className="text-sm font-medium">Password</label>
                 <input
+                  id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -80,6 +98,7 @@ export default function LoginPage() {
                 {error && (
                   <motion.p
                     key="error"
+                    role="alert"
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
@@ -91,8 +110,8 @@ export default function LoginPage() {
                 )}
               </AnimatePresence>
 
-              <Button type="submit" className="w-full mt-1">
-                Sign in
+              <Button type="submit" className="w-full mt-1" disabled={loading}>
+                {loading ? "Signing in…" : "Sign in"}
               </Button>
             </form>
           </CardContent>
@@ -105,10 +124,20 @@ export default function LoginPage() {
           </Link>
         </p>
 
-        <p className="text-xs text-center text-muted-foreground/60">
-          Demo: demo@myhome.app / demo1234
-        </p>
+        {process.env.NODE_ENV === "development" && (
+          <p className="text-xs text-center text-muted-foreground/60">
+            Dev seed: demo@myhome.app / demo1234
+          </p>
+        )}
       </motion.div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   )
 }

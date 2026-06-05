@@ -3,47 +3,11 @@
 import { motion } from "framer-motion"
 import { TrendingUp, TrendingDown, Wallet, PiggyBank } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
-import { cn } from "@/lib/utils"
-import { stats } from "@/lib/dummy-data"
-
-const cards = [
-  {
-    label: "Total Balance",
-    value: stats.balance,
-    icon: Wallet,
-    trend: "+4.2%",
-    positive: true,
-    color: "text-primary",
-    bg: "bg-primary/10",
-  },
-  {
-    label: "Monthly Income",
-    value: stats.income,
-    icon: TrendingUp,
-    trend: "+15.5%",
-    positive: true,
-    color: "text-success",
-    bg: "bg-success/10",
-  },
-  {
-    label: "Monthly Expenses",
-    value: stats.expenses,
-    icon: TrendingDown,
-    trend: "+3.1%",
-    positive: false,
-    color: "text-destructive",
-    bg: "bg-destructive/10",
-  },
-  {
-    label: "Savings",
-    value: stats.savings,
-    icon: PiggyBank,
-    trend: "+8.0%",
-    positive: true,
-    color: "text-warning",
-    bg: "bg-warning/10",
-  },
-]
+import { cn, formatCurrency } from "@/lib/utils"
+import { useGroup } from "@/components/providers/GroupProvider"
+import { useQueries } from "@tanstack/react-query"
+import { getExpenses, getIncomes } from "@/lib/actions/finance"
+import type { Expense, Income } from "@/lib/types"
 
 const container = {
   hidden: {},
@@ -56,6 +20,30 @@ const item = {
 }
 
 export function StatsCards() {
+  const { activeGroup } = useGroup()
+  const groupId = activeGroup.id
+  const currency = activeGroup.currency
+
+  const [{ data: expenses = [] }, { data: incomes = [] }] = useQueries({
+    queries: [
+      { queryKey: ["expenses", groupId, null], queryFn: () => getExpenses(groupId), staleTime: 60_000 },
+      { queryKey: ["incomes",  groupId, null], queryFn: () => getIncomes(groupId),  staleTime: 60_000 },
+    ],
+  }) as [{ data: Expense[] }, { data: Income[] }]
+
+  const thisMonth = new Date().toISOString().slice(0, 7)
+  const monthIncome   = incomes.filter((i) => i.date.startsWith(thisMonth)).reduce((s, i) => s + i.amount, 0)
+  const monthExpenses = expenses.filter((e) => e.date.startsWith(thisMonth)).reduce((s, e) => s + e.amount, 0)
+  const totalBalance  = incomes.reduce((s, i) => s + i.amount, 0) - expenses.reduce((s, e) => s + e.amount, 0)
+  const savings       = monthIncome - monthExpenses
+
+  const cards = [
+    { label: "Total Balance",    value: totalBalance,  icon: Wallet,      color: "text-primary",     bg: "bg-primary/10",     positive: true },
+    { label: "Monthly Income",   value: monthIncome,   icon: TrendingUp,  color: "text-success",     bg: "bg-success/10",     positive: true },
+    { label: "Monthly Expenses", value: monthExpenses, icon: TrendingDown,color: "text-destructive", bg: "bg-destructive/10", positive: false },
+    { label: "Savings",          value: savings,       icon: PiggyBank,   color: "text-warning",     bg: "bg-warning/10",     positive: savings >= 0 },
+  ]
+
   return (
     <motion.div
       variants={container}
@@ -74,10 +62,7 @@ export function StatsCards() {
                 </div>
               </div>
               <p className="text-xl md:text-2xl font-bold tracking-tight">
-                ${Math.abs(card.value).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </p>
-              <p className={cn("text-xs mt-1 font-medium", card.positive ? "text-success" : "text-destructive")}>
-                {card.trend} vs last month
+                {formatCurrency(Math.abs(card.value), currency)}
               </p>
             </CardContent>
           </Card>

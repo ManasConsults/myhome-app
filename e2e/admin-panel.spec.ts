@@ -1,31 +1,28 @@
 import { test, expect } from '@playwright/test'
+import { SignJWT } from 'jose'
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
-function adminCookie() {
-  return btoa(JSON.stringify({ userId: 'user-1', name: 'Manas Mallick', email: 'demo@myhome.app', role: 'admin' }))
+function getSecret(): Uint8Array {
+  return new TextEncoder().encode(process.env.SESSION_SECRET ?? '')
 }
 
-function userCookie() {
-  return btoa(JSON.stringify({ userId: 'user-2', name: 'Test User', email: 'test@example.com', role: 'user' }))
+async function makeSessionToken(payload: object): Promise<string> {
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')
+    .sign(getSecret())
 }
 
 async function loginAsAdmin(page: import('@playwright/test').Page) {
-  await page.context().addCookies([{
-    name: 'myhome-session',
-    value: adminCookie(),
-    domain: 'localhost',
-    path: '/',
-  }])
+  const value = await makeSessionToken({ userId: 'user-1', name: 'Manas Mallick', email: 'demo@myhome.app', role: 'admin' })
+  await page.context().addCookies([{ name: 'myhome-session', value, domain: 'localhost', path: '/' }])
 }
 
 async function loginAsUser(page: import('@playwright/test').Page) {
-  await page.context().addCookies([{
-    name: 'myhome-session',
-    value: userCookie(),
-    domain: 'localhost',
-    path: '/',
-  }])
+  const value = await makeSessionToken({ userId: 'user-2', name: 'Test User', email: 'test@example.com', role: 'user' })
+  await page.context().addCookies([{ name: 'myhome-session', value, domain: 'localhost', path: '/' }])
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -125,7 +122,6 @@ test.describe('Admin Panel', () => {
     })
 
     test('shows at least 1 admin (SEED_USER is admin)', async ({ page }) => {
-      const adminCard = page.locator('text=Admins').locator('..').locator('..').getByText('1')
       // The admin count is at least 1 — just check the stat area is populated
       const statArea = page.locator('[class*="grid"]').first()
       await expect(statArea).toBeVisible()

@@ -6,10 +6,12 @@ import { Plus, X, ShoppingCart, PackageCheck, DollarSign, Store } from "lucide-r
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { shoppingItems, type ShoppingItem } from "@/lib/dummy-data"
+import { type ShoppingItem } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { ShoppingList } from "@/components/dashboard/ShoppingList"
 import { EventFilter } from "@/components/ui/EventFilter"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { getShoppingItems, createShoppingItem, updateShoppingItem, deleteShoppingItem } from "@/lib/actions/shopping"
 
 const CATEGORIES = ["Produce", "Dairy", "Meat", "Bakery", "Frozen", "Drinks", "Snacks", "Cleaning", "Personal Care", "Other"]
 
@@ -28,14 +30,13 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 export function ShoppingSection() {
   const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const queryClient = useQueryClient()
   const currency = activeGroup.currency
 
   const formCardRef = useRef<HTMLDivElement>(null)
-  const [itemList, setItemList] = useState<ShoppingItem[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
-  // Form fields
   const [name, setName] = useState("")
   const [category, setCategory] = useState("Produce")
   const [quantity, setQuantity] = useState("1")
@@ -44,14 +45,23 @@ export function ShoppingSection() {
   const [store, setStore] = useState("")
   const [eventId, setEventId] = useState("")
 
-  useEffect(() => {
-    const next = activeEvent
-      ? shoppingItems.filter((i) => i.eventId === activeEvent.id)
-      : shoppingItems.filter((i) => i.groupId === activeGroup.id)
-    setItemList(next)
-  }, [activeGroup.id, activeEvent?.id])
-
   useEffect(() => { setEventId(activeEvent?.id ?? "") }, [activeEvent?.id])
+
+  const { data: itemList = [] } = useQuery({
+    queryKey: ["shopping", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: () => getShoppingItems(activeGroup.id, activeEvent?.id),
+  })
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["shopping", activeGroup.id] })
+
+  const createMutation = useMutation({ mutationFn: createShoppingItem, onSuccess: invalidate })
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Omit<ShoppingItem, "id" | "createdAt" | "updatedAt">> }) =>
+      updateShoppingItem(id, data),
+    onSuccess: invalidate,
+  })
+  const deleteMutation = useMutation({ mutationFn: deleteShoppingItem, onSuccess: invalidate })
 
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 
@@ -104,33 +114,27 @@ export function ShoppingSection() {
     resetForm()
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim() || !store.trim()) return
 
     if (editingId) {
-      setItemList((prev) =>
-        prev.map((it) =>
-          it.id === editingId
-            ? {
-                ...it,
-                name: name.trim(),
-                category,
-                quantity: parseFloat(quantity) || 1,
-                unit: unit.trim() || "pcs",
-                estimatedPrice: parseFloat(price) || 0,
-                store: store.trim(),
-                icon: CATEGORY_ICONS[category] ?? "🛍️",
-                ...(eventId ? { eventId } : { eventId: undefined }),
-                updatedAt: new Date().toISOString().slice(0, 10),
-              }
-            : it
-        )
-      )
+      const result = await updateMutation.mutateAsync({
+        id: editingId,
+        data: {
+          name: name.trim(),
+          category,
+          quantity: parseFloat(quantity) || 1,
+          unit: unit.trim() || "pcs",
+          estimatedPrice: parseFloat(price) || 0,
+          store: store.trim(),
+          icon: CATEGORY_ICONS[category] ?? "🛍️",
+          ...(eventId ? { eventId } : { eventId: undefined }),
+        },
+      })
+      if (result.success) closeForm()
     } else {
-      const now = new Date().toISOString().slice(0, 10)
-      const newItem: ShoppingItem = {
-        id: `shop-${Date.now()}`,
+      const result = await createMutation.mutateAsync({
         name: name.trim(),
         category,
         quantity: parseFloat(quantity) || 1,
@@ -141,17 +145,13 @@ export function ShoppingSection() {
         icon: CATEGORY_ICONS[category] ?? "🛍️",
         groupId: activeGroup.id,
         ...(eventId ? { eventId } : {}),
-        createdAt: now,
-        updatedAt: now,
-      }
-      setItemList((prev) => [newItem, ...prev])
+      })
+      if (result.success) closeForm()
     }
-
-    closeForm()
   }
 
-  function handleDelete(id: string) {
-    setItemList((prev) => prev.filter((it) => it.id !== id))
+  async function handleDelete(id: string) {
+    await deleteMutation.mutateAsync(id)
   }
 
   return (
@@ -210,7 +210,6 @@ export function ShoppingSection() {
               <div className="p-4 flex flex-col gap-3 border-b border-border/60">
                 <p className="text-sm font-medium">{editingId ? "Edit item" : "New item"}</p>
 
-                {/* Name + Store */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
                     <label className="text-xs text-muted-foreground font-medium">Item name</label>
@@ -236,7 +235,6 @@ export function ShoppingSection() {
                   </div>
                 </div>
 
-                {/* Category */}
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-muted-foreground font-medium">Category</label>
                   <select
@@ -248,7 +246,6 @@ export function ShoppingSection() {
                   </select>
                 </div>
 
-                {/* Quantity + Unit + Price */}
                 <div className="grid grid-cols-3 gap-2">
                   <div className="flex flex-col gap-1">
                     <label className="text-xs text-muted-foreground font-medium">Qty</label>
@@ -289,7 +286,6 @@ export function ShoppingSection() {
                   </div>
                 </div>
 
-                {/* Event (optional, only when group has events) */}
                 {groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
                     <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
@@ -308,7 +304,11 @@ export function ShoppingSection() {
 
                 <div className="flex items-center gap-2 justify-end">
                   <Button type="button" variant="ghost" size="sm" onClick={closeForm}>Cancel</Button>
-                  <Button type="submit" size="sm">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={createMutation.isPending || updateMutation.isPending}
+                  >
                     {editingId ? "Save changes" : "Add item"}
                   </Button>
                 </div>

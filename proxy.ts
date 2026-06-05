@@ -1,26 +1,33 @@
-import { NextRequest, NextResponse } from "next/server"
-import { decodeSession } from "@/lib/dummy-users"
+import { auth } from "@/auth"
+import { NextResponse } from "next/server"
 
-const PUBLIC_PATHS = ["/login", "/register"]
+const ALLOWED_DOMAIN = process.env.ALLOWED_DOMAIN
 
-export default function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl
-  const session = request.cookies.get("myhome-session")
+export default auth((req) => {
+  if (ALLOWED_DOMAIN) {
+    const hostname = (req.headers.get("host") ?? "").split(":")[0]
+    if (hostname !== ALLOWED_DOMAIN && !hostname.endsWith(`.${ALLOWED_DOMAIN}`)) {
+      return new NextResponse("Not found", { status: 404 })
+    }
+  }
 
-  // Admin gate — must be authenticated AND role === "admin"
+  const { pathname } = req.nextUrl
+  const session = req.auth
+
   if (pathname.startsWith("/admin")) {
-    if (!session) return NextResponse.redirect(new URL("/login", request.url))
-    const payload = decodeSession(session.value)
-    if (payload?.role !== "admin") return NextResponse.redirect(new URL("/", request.url))
+    if (!session) return NextResponse.redirect(new URL("/login", req.url))
+    if (session.user.role !== "admin") return NextResponse.redirect(new URL("/", req.url))
     return NextResponse.next()
   }
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
-  if (!session && !isPublic) return NextResponse.redirect(new URL("/login", request.url))
-  if (session && isPublic) return NextResponse.redirect(new URL("/", request.url))
+  const isPublic = pathname.startsWith("/login") || pathname.startsWith("/register")
+
+  if (!session && !isPublic) return NextResponse.redirect(new URL("/login", req.url))
+  if (session && isPublic) return NextResponse.redirect(new URL("/", req.url))
+
   return NextResponse.next()
-}
+})
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon\\.ico|public/).*)"],
+  matcher: ["/((?!api/auth|_next/static|_next/image|favicon\\.ico|public/).*)"],
 }

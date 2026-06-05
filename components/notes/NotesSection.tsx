@@ -6,32 +6,31 @@ import { Plus, X, FileText, Pin, Tag, Clock } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { notes, type Note } from "@/lib/dummy-data"
+import { type Note } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { NotesGrid } from "@/components/notes/NotesGrid"
 import { EventFilter } from "@/components/ui/EventFilter"
-
-const WEEK_AGO = "2026-03-31"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { getNotes, createNote, updateNote, deleteNote } from "@/lib/actions/notes"
 
 const CATEGORIES = ["General", "Home", "Finance", "Health", "Work", "Personal", "Shopping", "Travel", "Other"]
 
-const COLORS: { value: Note["color"]; label: string; dot: string }[] = [
-  { value: "default", label: "Default", dot: "bg-border" },
-  { value: "blue",    label: "Blue",    dot: "bg-primary" },
-  { value: "green",   label: "Green",   dot: "bg-success" },
-  { value: "yellow",  label: "Yellow",  dot: "bg-warning" },
-  { value: "rose",    label: "Rose",    dot: "bg-destructive" },
+const COLORS: { value: Note["color"]; label: string }[] = [
+  { value: "default", label: "Default" },
+  { value: "blue",    label: "Blue" },
+  { value: "green",   label: "Green" },
+  { value: "yellow",  label: "Yellow" },
+  { value: "rose",    label: "Rose" },
 ]
 
 export function NotesSection() {
   const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const queryClient = useQueryClient()
 
   const formCardRef = useRef<HTMLDivElement>(null)
-  const [noteList, setNoteList] = useState<Note[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
-  // Form fields
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [category, setCategory] = useState("General")
@@ -39,23 +38,32 @@ export function NotesSection() {
   const [pinned, setPinned] = useState(false)
   const [eventId, setEventId] = useState("")
 
-  // Reset list when scope changes
-  useEffect(() => {
-    const next = activeEvent
-      ? notes.filter((n) => n.eventId === activeEvent.id)
-      : notes.filter((n) => n.groupId === activeGroup.id)
-    setNoteList(next)
-  }, [activeGroup.id, activeEvent?.id])
-
-  // Sync eventId with activeEvent
   useEffect(() => { setEventId(activeEvent?.id ?? "") }, [activeEvent?.id])
+
+  const { data: noteList = [] } = useQuery({
+    queryKey: ["notes", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: () => getNotes(activeGroup.id, activeEvent?.id),
+  })
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["notes", activeGroup.id] })
+
+  const createMutation = useMutation({ mutationFn: createNote, onSuccess: invalidate })
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Note, "id" | "createdAt" | "updatedAt">> }) =>
+      updateNote(id, data),
+    onSuccess: invalidate,
+  })
+  const deleteMutation = useMutation({ mutationFn: deleteNote, onSuccess: invalidate })
 
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 
+  // eslint-disable-next-line react-hooks/purity
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
   const total = noteList.length
   const pinnedCount = noteList.filter((n) => n.pinned).length
   const categoryCount = new Set(noteList.map((n) => n.category)).size
-  const thisWeek = noteList.filter((n) => n.updatedAt >= WEEK_AGO).length
+  const thisWeek = noteList.filter((n) => n.updatedAt >= sevenDaysAgo).length
 
   const statsData = [
     { label: "Total Notes", value: total, icon: FileText, color: "text-primary", bg: "bg-primary/10" },
@@ -99,49 +107,39 @@ export function NotesSection() {
     resetForm()
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim() || !content.trim()) return
 
     if (editingId) {
-      setNoteList((prev) =>
-        prev.map((n) =>
-          n.id === editingId
-            ? {
-                ...n,
-                title: title.trim(),
-                content: content.trim(),
-                category,
-                pinned,
-                color,
-                updatedAt: new Date().toISOString().slice(0, 10),
-                ...(eventId ? { eventId } : { eventId: undefined }),
-              }
-            : n
-        )
-      )
+      const result = await updateMutation.mutateAsync({
+        id: editingId,
+        data: {
+          title: title.trim(),
+          content: content.trim(),
+          category,
+          pinned,
+          color,
+          ...(eventId ? { eventId } : { eventId: undefined }),
+        },
+      })
+      if (result.success) closeForm()
     } else {
-      const now = new Date().toISOString().slice(0, 10)
-      const newNote: Note = {
-        id: `note-${Date.now()}`,
+      const result = await createMutation.mutateAsync({
         title: title.trim(),
         content: content.trim(),
         category,
         pinned,
         color,
-        createdAt: now,
-        updatedAt: now,
         groupId: activeGroup.id,
         ...(eventId ? { eventId } : {}),
-      }
-      setNoteList((prev) => [newNote, ...prev])
+      })
+      if (result.success) closeForm()
     }
-
-    closeForm()
   }
 
-  function handleDelete(id: string) {
-    setNoteList((prev) => prev.filter((n) => n.id !== id))
+  async function handleDelete(id: string) {
+    await deleteMutation.mutateAsync(id)
   }
 
   return (
@@ -200,7 +198,6 @@ export function NotesSection() {
               <div className="p-4 flex flex-col gap-3 border-b border-border/60">
                 <p className="text-sm font-medium">{editingId ? "Edit note" : "New note"}</p>
 
-                {/* Title */}
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-muted-foreground font-medium">Title</label>
                   <input
@@ -213,7 +210,6 @@ export function NotesSection() {
                   />
                 </div>
 
-                {/* Content */}
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-muted-foreground font-medium">Content</label>
                   <textarea
@@ -226,7 +222,6 @@ export function NotesSection() {
                   />
                 </div>
 
-                {/* Category + Color */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
                     <label className="text-xs text-muted-foreground font-medium">Category</label>
@@ -250,7 +245,6 @@ export function NotesSection() {
                   </div>
                 </div>
 
-                {/* Pinned toggle */}
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
@@ -270,7 +264,6 @@ export function NotesSection() {
                   <span className="text-sm font-medium">Pin note</span>
                 </div>
 
-                {/* Event (optional) */}
                 {groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
                     <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
@@ -289,7 +282,11 @@ export function NotesSection() {
 
                 <div className="flex items-center gap-2 justify-end">
                   <Button type="button" variant="ghost" size="sm" onClick={closeForm}>Cancel</Button>
-                  <Button type="submit" size="sm">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={createMutation.isPending || updateMutation.isPending}
+                  >
                     {editingId ? "Save changes" : "Add note"}
                   </Button>
                 </div>

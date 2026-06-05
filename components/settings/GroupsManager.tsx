@@ -1,13 +1,15 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Plus, X, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { groups as initialGroups, type Group } from "@/lib/dummy-data"
+import { type Group } from "@/lib/types"
 import { useAuth } from "@/components/providers/AuthProvider"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { getGroups, createGroup, updateGroup, deleteGroup } from "@/lib/actions/groups"
 
 const COLOR_MAP = {
   primary:     { bg: "bg-primary/10",     text: "text-primary",     dot: "bg-primary" },
@@ -40,13 +42,21 @@ const DEFAULT_FORM: FormState = { name: "", location: "", icon: "🏠", color: "
 
 export function GroupsManager() {
   const { user } = useAuth()
-  const userId = user?.userId ?? "user-1"
+  const userId = user?.id ?? ""
+  const queryClient = useQueryClient()
   const formRef = useRef<HTMLDivElement>(null)
-  const [groups, setGroups] = useState<Group[]>([])
 
-  useEffect(() => {
-    setGroups(initialGroups.filter((g) => g.userId === userId))
-  }, [userId])
+  const { data: groups = [] } = useQuery({
+    queryKey: ["groups", userId],
+    queryFn: () => getGroups(),
+    enabled: !!userId,
+  })
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["groups", userId] })
+  const createMutation = useMutation({ mutationFn: (data: Parameters<typeof createGroup>[1]) => createGroup(userId, data), onSuccess: invalidate })
+  const updateMutation = useMutation({ mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateGroup>[1] }) => updateGroup(id, data), onSuccess: invalidate })
+  const deleteMutation = useMutation({ mutationFn: deleteGroup, onSuccess: invalidate })
+
   const [sortBy, setSortBy] = useState<SortKey>("name")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const [showForm, setShowForm] = useState(false)
@@ -73,49 +83,30 @@ export function GroupsManager() {
     setForm(DEFAULT_FORM)
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (!form.name.trim()) return
 
-    const today = new Date().toISOString().slice(0, 10)
-
-    if (editingId) {
-      setGroups((prev) =>
-        prev.map((g) =>
-          g.id === editingId
-            ? {
-                ...g,
-                name: form.name.trim(),
-                icon: form.icon.trim() || "🏠",
-                color: form.color,
-                currency: form.currency,
-                updatedAt: today,
-                ...(form.location.trim() ? { location: form.location.trim() } : { location: undefined }),
-              }
-            : g
-        )
-      )
-    } else {
-      const newGroup: Group = {
-        id: `g${Date.now()}`,
-        name: form.name.trim(),
-        type: "household",
-        icon: form.icon.trim() || "🏠",
-        color: form.color,
-        currency: form.currency,
-        userId,
-        createdAt: today,
-        updatedAt: today,
-        ...(form.location.trim() ? { location: form.location.trim() } : {}),
-      }
-      setGroups((prev) => [...prev, newGroup])
+    const payload = {
+      name: form.name.trim(),
+      type: "household" as const,
+      icon: form.icon.trim() || "🏠",
+      color: form.color,
+      currency: form.currency,
+      ...(form.location.trim() ? { location: form.location.trim() } : { location: undefined }),
     }
 
-    closeForm()
+    if (editingId) {
+      const result = await updateMutation.mutateAsync({ id: editingId, data: payload })
+      if (result.success) closeForm()
+    } else {
+      const result = await createMutation.mutateAsync(payload)
+      if (result.success) closeForm()
+    }
   }
 
-  function handleDelete(id: string) {
-    setGroups((prev) => prev.filter((g) => g.id !== id))
+  async function handleDelete(id: string) {
+    await deleteMutation.mutateAsync(id)
     setDeleteId(null)
   }
 

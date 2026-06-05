@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { notes, type Note } from "@/lib/dummy-data"
+import { type Note } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Pin, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -52,13 +52,13 @@ const cardVariants = {
 }
 
 interface NotesGridProps {
-  data?: Note[]
+  data: Note[]
   onEdit?: (note: Note) => void
   onDelete?: (id: string) => void
 }
 
 export function NotesGrid({ data, onEdit, onDelete }: NotesGridProps) {
-  const source = data ?? notes
+  const source = data
   const [sortBy, setSortBy] = useState<SortKey>("updatedAt")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -168,7 +168,7 @@ export function NotesGrid({ data, onEdit, onDelete }: NotesGridProps) {
                 {onEdit && (
                   <button
                     onClick={() => onEdit(note)}
-                    className="flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                    className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
                     aria-label="Edit note"
                   >
                     <Pencil className="size-3" />
@@ -177,7 +177,7 @@ export function NotesGrid({ data, onEdit, onDelete }: NotesGridProps) {
                 {onDelete && (
                   <button
                     onClick={() => setDeleteId(note.id)}
-                    className="flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                     aria-label="Delete note"
                   >
                     <Trash2 className="size-3" />

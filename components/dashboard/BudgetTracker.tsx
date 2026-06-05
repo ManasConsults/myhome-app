@@ -2,9 +2,11 @@
 
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { budgets } from "@/lib/dummy-data"
 import { cn, formatCurrency } from "@/lib/utils"
 import { useGroup } from "@/components/providers/GroupProvider"
+import { useQuery } from "@tanstack/react-query"
+import { getBudgets } from "@/lib/actions/finance"
+import type { Budget } from "@/lib/types"
 
 const container = {
   hidden: {},
@@ -15,18 +17,26 @@ export function BudgetTracker() {
   const { activeGroup } = useGroup()
   const currency = activeGroup.currency
 
+  const { data: budgets = [] } = useQuery<Budget[]>({
+    queryKey: ["budgets", activeGroup.id, null],
+    queryFn: () => getBudgets(activeGroup.id),
+  })
+
+  const now = new Date()
+  const periodLabel = now.toLocaleString("default", { month: "long", year: "numeric" })
+
   return (
     <Card className="border-border/60">
       <CardHeader className="pb-2 pt-5 px-5">
         <CardTitle className="text-base font-semibold">Budget Tracker</CardTitle>
-        <p className="text-xs text-muted-foreground">March 2026</p>
+        <p className="text-xs text-muted-foreground">{periodLabel}</p>
       </CardHeader>
       <CardContent className="px-5 pb-5">
         <motion.div variants={container} initial="hidden" animate="visible" className="flex flex-col gap-4">
           {budgets.map((b, i) => {
-            const pct = Math.min(Math.round((b.spent / b.budget) * 100), 100)
-            const overBudget = b.spent > b.budget
-            const remaining = b.budget - b.spent
+            const pct = Math.min(Math.round((b.spent / b.amount) * 100), 100)
+            const overBudget = b.spent > b.amount
+            const remaining = b.amount - b.spent
 
             return (
               <motion.div
@@ -42,7 +52,7 @@ export function BudgetTracker() {
                   </div>
                   <div className="text-right">
                     <span className="text-sm font-semibold">{formatCurrency(b.spent, currency, 0)}</span>
-                    <span className="text-xs text-muted-foreground"> / {formatCurrency(b.budget, currency, 0)}</span>
+                    <span className="text-xs text-muted-foreground"> / {formatCurrency(b.amount, currency, 0)}</span>
                   </div>
                 </div>
                 <div className="h-2 bg-muted rounded-full overflow-hidden">

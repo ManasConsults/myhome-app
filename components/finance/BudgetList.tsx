@@ -7,8 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { userBudgets, type Budget } from "@/lib/dummy-data"
+import { type Budget } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { getBudgets, createBudget, updateBudget, deleteBudget } from "@/lib/actions/finance"
 
 type TabType = "monthly" | "yearly"
 type SortKey = "updatedAt" | "createdAt" | "amount" | "spent"
@@ -62,12 +64,12 @@ const EMPTY_FORM: FormState = { name: "", category: "Food & Dining", type: "mont
 
 export function BudgetList() {
   const { activeGroup, activeEvent, events } = useGroup()
+  const queryClient = useQueryClient()
   const currency = activeGroup.currency
   const formCardRef = useRef<HTMLDivElement>(null)
   const [activeTab, setActiveTab]     = useState<TabType>("monthly")
   const [sortBy, setSortBy]           = useState<SortKey>("updatedAt")
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("desc")
-  const [budgetList, setBudgetList]   = useState<Budget[]>([])
   const [showForm, setShowForm]       = useState(false)
   const [editingId, setEditingId]     = useState<string | null>(null)
   const [deleteId, setDeleteId]       = useState<string | null>(null)
@@ -75,15 +77,20 @@ export function BudgetList() {
 
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 
-  // Reset list on scope change
-  useEffect(() => {
-    const next = activeEvent
-      ? userBudgets.filter((b) => b.eventId === activeEvent.id)
-      : userBudgets.filter((b) => b.groupId === activeGroup.id)
-    setBudgetList(next)
-  }, [activeGroup.id, activeEvent?.id])
+  const { data: budgetList = [] } = useQuery({
+    queryKey: ["budgets", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: () => getBudgets(activeGroup.id, activeEvent?.id),
+  })
 
-  // Sync eventId when activeEvent changes
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["budgets", activeGroup.id] })
+  const createMutation = useMutation({ mutationFn: createBudget, onSuccess: invalidate })
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Budget, "id" | "createdAt" | "updatedAt">> }) =>
+      updateBudget(id, data),
+    onSuccess: invalidate,
+  })
+  const deleteMutation = useMutation({ mutationFn: deleteBudget, onSuccess: invalidate })
+
   useEffect(() => {
     setForm((f) => ({ ...f, eventId: activeEvent?.id ?? "" }))
   }, [activeEvent?.id])
@@ -120,22 +127,25 @@ export function BudgetList() {
     setForm(EMPTY_FORM)
   }
 
-  function handleSave() {
+  async function handleSave() {
     const amount = parseFloat(form.amount)
     if (!form.name.trim() || !amount || amount <= 0) return
 
     if (editingId) {
-      setBudgetList((prev) =>
-        prev.map((b) =>
-          b.id === editingId
-            ? { ...b, name: form.name.trim(), category: form.category, type: form.type, amount, ...(form.eventId ? { eventId: form.eventId } : { eventId: undefined }), updatedAt: new Date().toISOString().slice(0, 10) }
-            : b
-        )
-      )
+      const result = await updateMutation.mutateAsync({
+        id: editingId,
+        data: {
+          name: form.name.trim(),
+          category: form.category,
+          type: form.type,
+          amount,
+          ...(form.eventId ? { eventId: form.eventId } : { eventId: undefined }),
+        },
+      })
+      if (result.success) closeForm()
     } else {
       const now = new Date().toISOString().slice(0, 10)
-      const newBudget: Budget = {
-        id: `budget-${Date.now()}`,
+      const result = await createMutation.mutateAsync({
         name: form.name.trim(),
         category: form.category,
         type: form.type,
@@ -149,16 +159,13 @@ export function BudgetList() {
           : String(new Date().getFullYear()),
         groupId: activeGroup.id,
         ...(form.eventId ? { eventId: form.eventId } : {}),
-        createdAt: now,
-        updatedAt: now,
-      }
-      setBudgetList((prev) => [newBudget, ...prev])
+      })
+      if (result.success) closeForm()
     }
-    closeForm()
   }
 
-  function handleDelete(id: string) {
-    setBudgetList((prev) => prev.filter((b) => b.id !== id))
+  async function handleDelete(id: string) {
+    await deleteMutation.mutateAsync(id)
     setDeleteId(null)
   }
 
@@ -245,21 +252,29 @@ export function BudgetList() {
               <div className="rounded-xl border border-border/60 bg-muted/30 p-4 mb-4 flex flex-col gap-3">
                 <p className="text-sm font-medium">{editingId ? "Edit Budget" : "New Budget"}</p>
 
-                <input
-                  type="text"
-                  placeholder="Budget name"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="border border-input rounded-lg px-3 py-2 text-sm bg-background w-full focus:outline-none focus:ring-2 focus:ring-ring"
-                />
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="budget-name" className="text-xs text-muted-foreground font-medium">Name</label>
+                  <input
+                    id="budget-name"
+                    type="text"
+                    placeholder="Budget name"
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    className="border border-input rounded-lg px-3 py-2 text-sm bg-background w-full focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
 
-                <select
-                  value={form.category}
-                  onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                  className="border border-input rounded-lg px-3 py-2 text-sm bg-background w-full focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="budget-category" className="text-xs text-muted-foreground font-medium">Category</label>
+                  <select
+                    id="budget-category"
+                    value={form.category}
+                    onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                    className="border border-input rounded-lg px-3 py-2 text-sm bg-background w-full focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
 
                 <div className="flex items-center gap-1 bg-muted rounded-lg p-1 w-fit">
                   {(["monthly", "yearly"] as const).map((t) => (
@@ -278,21 +293,26 @@ export function BudgetList() {
                   ))}
                 </div>
 
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{getCurrencySymbol(currency)}</span>
-                  <input
-                    type="number"
-                    placeholder="0.00"
-                    value={form.amount}
-                    onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                    className="border border-input rounded-lg pl-7 pr-3 py-2 text-sm bg-background w-full focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="budget-amount" className="text-xs text-muted-foreground font-medium">Amount</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{getCurrencySymbol(currency)}</span>
+                    <input
+                      id="budget-amount"
+                      type="number"
+                      placeholder="0.00"
+                      value={form.amount}
+                      onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                      className="border border-input rounded-lg pl-7 pr-3 py-2 text-sm bg-background w-full focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
                 </div>
 
                 {groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
+                    <label htmlFor="budget-event" className="text-xs text-muted-foreground font-medium">Event (optional)</label>
                     <select
+                      id="budget-event"
                       value={form.eventId}
                       onChange={(e) => setForm((f) => ({ ...f, eventId: e.target.value }))}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -381,14 +401,14 @@ export function BudgetList() {
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => openEdit(b)}
-                                className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                                 aria-label="Edit budget"
                               >
                                 <Pencil className="size-3.5" />
                               </button>
                               <button
                                 onClick={() => setDeleteId(b.id)}
-                                className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                                 aria-label="Delete budget"
                               >
                                 <Trash2 className="size-3.5" />

@@ -9,10 +9,9 @@ import { AdminHeader } from "@/components/admin/AdminHeader"
 import {
   getAppSettings,
   saveAppSettings,
-  patchAllGroupCurrencies,
   DEFAULT_APP_SETTINGS,
   type AppSettings,
-} from "@/lib/dummy-users"
+} from "@/lib/session"
 import { THEME_COLORS } from "@/lib/theme-colors"
 
 const CURRENCIES = ["AUD", "USD", "EUR", "GBP", "CAD", "NZD", "SGD", "INR"]
@@ -44,7 +43,6 @@ export default function AdminSettingsPage() {
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
     saveAppSettings(settings)
-    patchAllGroupCurrencies(settings.defaultCurrency)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }

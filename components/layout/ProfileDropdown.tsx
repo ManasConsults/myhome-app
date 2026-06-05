@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/providers/AuthProvider"
 import { cn } from "@/lib/utils"
-import type { UserRole } from "@/lib/dummy-users"
+import type { UserRole } from "@/lib/session"
 
 const ROLE_PILL: Record<UserRole, { label: string; className: string }> = {
   admin:   { label: "Admin",   className: "bg-primary/10 text-primary" },

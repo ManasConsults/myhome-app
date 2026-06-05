@@ -1,5 +1,5 @@
-import type { Metadata } from "next"
-import { Header } from "@/components/layout/Header"
+"use client"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -7,11 +7,22 @@ import { Separator } from "@/components/ui/separator"
 import { User, Bell, Globe, Home, ChevronRight, Palette } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ColorPicker } from "@/components/settings/ColorPicker"
-import { userProfile } from "@/lib/dummy-data"
+import { Header } from "@/components/layout/Header"
+import { useAuth } from "@/components/providers/AuthProvider"
+import { getAppSettings } from "@/lib/session"
 
-export const metadata: Metadata = { title: "Settings" }
+function getInitials(name: string): string {
+  return name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("")
+}
 
 export default function SettingsPage() {
+  const { user } = useAuth()
+  const settings = getAppSettings()
+
+  const name = user?.name ?? ""
+  const email = user?.email ?? ""
+  const initials = getInitials(name)
+
   return (
     <>
       <Header title="Settings" />
@@ -29,12 +40,12 @@ export default function SettingsPage() {
             <div className="flex items-center gap-4">
               <Avatar className="size-14">
                 <AvatarFallback className="bg-primary text-primary-foreground text-lg font-semibold">
-                  {userProfile.initials}
+                  {initials}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <p className="font-semibold text-base">{userProfile.name}</p>
-                <p className="text-sm text-muted-foreground">{userProfile.email}</p>
+                <p className="font-semibold text-base">{name || "—"}</p>
+                <p className="text-sm text-muted-foreground">{email || "—"}</p>
                 <Badge variant="outline" className="mt-1.5 text-xs">Free plan</Badge>
               </div>
             </div>
@@ -68,8 +79,8 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="px-5 pb-5">
             {[
-              { label: "Currency", value: userProfile.currency },
-              { label: "Timezone", value: userProfile.timezone },
+              { label: "Currency", value: settings.defaultCurrency },
+              { label: "Timezone", value: settings.defaultTimezone },
               { label: "Date format", value: "DD/MM/YYYY" },
               { label: "Language", value: "English" },
             ].map((pref, i, arr) => (
@@ -98,25 +109,24 @@ export default function SettingsPage() {
           <CardContent className="px-5 pb-5">
             {(
               [
-                { key: "budgetAlerts", label: "Budget alerts", description: "Notify when nearing budget limit" },
-                { key: "taskReminders", label: "Task reminders", description: "Reminders for upcoming due dates" },
-                { key: "weeklyReport", label: "Weekly report", description: "Summary of your week every Sunday" },
+                { key: "budgetAlerts", label: "Budget alerts", description: "Notify when nearing budget limit", defaultOn: true },
+                { key: "taskReminders", label: "Task reminders", description: "Reminders for upcoming due dates", defaultOn: true },
+                { key: "weeklyReport", label: "Weekly report", description: "Summary of your week every Sunday", defaultOn: false },
               ] as const
-            ).map(({ key, label, description }, i, arr) => (
+            ).map(({ key, label, description, defaultOn }, i, arr) => (
               <div key={key}>
                 <div className="flex items-center justify-between py-3">
                   <div>
                     <p className="text-sm font-medium">{label}</p>
                     <p className="text-xs text-muted-foreground">{description}</p>
                   </div>
-                  {/* Static toggle — visual only */}
                   <div className={cn(
                     "w-10 h-6 rounded-full relative transition-colors",
-                    userProfile.notifications[key] ? "bg-primary" : "bg-muted"
+                    defaultOn ? "bg-primary" : "bg-muted"
                   )}>
                     <div className={cn(
                       "absolute top-1 size-4 rounded-full bg-white shadow-sm transition-transform",
-                      userProfile.notifications[key] ? "translate-x-5" : "translate-x-1"
+                      defaultOn ? "translate-x-5" : "translate-x-1"
                     )} />
                   </div>
                 </div>

@@ -3,8 +3,9 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { TrendingUp, RefreshCw, Banknote, CalendarDays } from "lucide-react"
 import { cn, formatCurrency } from "@/lib/utils"
-import { incomes } from "@/lib/dummy-data"
 import { useGroup } from "@/components/providers/GroupProvider"
+import { useQuery } from "@tanstack/react-query"
+import { getIncomes } from "@/lib/actions/finance"
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 function fmtDate(iso: string): string {
@@ -22,14 +23,16 @@ function monthlyEquivalent(amount: number, frequency: string): number {
   }
 }
 
-const currentMonth = "2026-04"
-
 export function IncomeStats() {
   const { activeGroup, activeEvent } = useGroup()
   const currency = activeGroup.currency
-  const groupIncomes = activeEvent
-    ? incomes.filter((i) => i.eventId === activeEvent.id)
-    : incomes.filter((i) => i.groupId === activeGroup.id)
+
+  const { data: groupIncomes = [] } = useQuery({
+    queryKey: ["incomes", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: () => getIncomes(activeGroup.id, activeEvent?.id),
+  })
+
+  const currentMonth = new Date().toISOString().slice(0, 7)
   const recurring = groupIncomes.filter((i) => i.recurring)
   const oneOff = groupIncomes.filter((i) => !i.recurring && i.date.startsWith(currentMonth))
 

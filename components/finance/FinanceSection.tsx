@@ -4,8 +4,9 @@ import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { PiggyBank, Receipt, Banknote, ArrowRight } from "lucide-react"
 import { cn, formatCurrency } from "@/lib/utils"
-import { userBudgets, expenses, incomes } from "@/lib/dummy-data"
 import { useGroup } from "@/components/providers/GroupProvider"
+import { useQueries } from "@tanstack/react-query"
+import { getBudgets, getExpenses, getIncomes } from "@/lib/actions/finance"
 
 function monthlyEquivalent(amount: number, frequency: string): number {
   switch (frequency) {
@@ -20,29 +21,39 @@ function monthlyEquivalent(amount: number, frequency: string): number {
 export function FinanceSection() {
   const { activeGroup, activeEvent } = useGroup()
   const currency = activeGroup.currency
+  const scopeArgs: [string, string | undefined] = [activeGroup.id, activeEvent?.id]
 
-  const groupBudgets = activeEvent
-    ? userBudgets.filter((b) => b.eventId === activeEvent.id)
-    : userBudgets.filter((b) => b.groupId === activeGroup.id)
-  const groupExpenses = activeEvent
-    ? expenses.filter((e) => e.eventId === activeEvent.id)
-    : expenses.filter((e) => e.groupId === activeGroup.id)
-  const groupIncomes = activeEvent
-    ? incomes.filter((i) => i.eventId === activeEvent.id)
-    : incomes.filter((i) => i.groupId === activeGroup.id)
+  const [budgetsQ, expensesQ, incomesQ] = useQueries({
+    queries: [
+      {
+        queryKey: ["budgets", activeGroup.id, activeEvent?.id ?? null],
+        queryFn: () => getBudgets(...scopeArgs),
+      },
+      {
+        queryKey: ["expenses", activeGroup.id, activeEvent?.id ?? null],
+        queryFn: () => getExpenses(...scopeArgs),
+      },
+      {
+        queryKey: ["incomes", activeGroup.id, activeEvent?.id ?? null],
+        queryFn: () => getIncomes(...scopeArgs),
+      },
+    ],
+  })
+
+  const groupBudgets = budgetsQ.data ?? []
+  const groupExpenses = expensesQ.data ?? []
+  const groupIncomes = incomesQ.data ?? []
 
   const overBudget = groupBudgets.filter((b) => b.spent > b.amount).length
   const onTrack = groupBudgets.filter((b) => b.spent / b.amount < 0.8).length
 
-  const recurringExpenses = groupExpenses.filter((e) => e.recurring)
-  const monthlyExpenseFixed = recurringExpenses.reduce(
-    (sum, e) => sum + monthlyEquivalent(e.amount, e.frequency ?? "monthly"), 0
-  )
+  const monthlyExpenseFixed = groupExpenses
+    .filter((e) => e.recurring)
+    .reduce((sum, e) => sum + monthlyEquivalent(e.amount, e.frequency ?? "monthly"), 0)
 
-  const recurringIncome = groupIncomes.filter((i) => i.recurring)
-  const monthlyIncomeRecurring = recurringIncome.reduce(
-    (sum, i) => sum + monthlyEquivalent(i.amount, i.frequency ?? "monthly"), 0
-  )
+  const monthlyIncomeRecurring = groupIncomes
+    .filter((i) => i.recurring)
+    .reduce((sum, i) => sum + monthlyEquivalent(i.amount, i.frequency ?? "monthly"), 0)
 
   const quickLinks = [
     {

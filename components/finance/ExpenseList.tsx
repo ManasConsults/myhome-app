@@ -6,9 +6,11 @@ import { Plus, X, RefreshCw, Calendar, Pencil, Trash2, ArrowUp, ArrowDown } from
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { expenses as initialExpenses, type Expense } from "@/lib/dummy-data"
+import { type Expense } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { EventFilter } from "@/components/ui/EventFilter"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { getExpenses, createExpense, updateExpense, deleteExpense } from "@/lib/actions/finance"
 
 type Tab = "all" | "recurring" | "one-off"
 type Frequency = "weekly" | "fortnightly" | "monthly" | "yearly"
@@ -103,24 +105,29 @@ const itemVariants = {
 
 export function ExpenseList() {
   const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const queryClient = useQueryClient()
   const currency = activeGroup.currency
   const formCardRef = useRef<HTMLDivElement>(null)
   const [tab, setTab] = useState<Tab>("all")
   const [sortBy, setSortBy] = useState<SortKey>("updatedAt")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
-  const [expenses, setExpenses] = useState<Expense[]>(() =>
-    initialExpenses.filter((e) => e.groupId === "g1")
-  )
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  useEffect(() => {
-    const next = activeEvent
-      ? initialExpenses.filter((e) => e.eventId === activeEvent.id)
-      : initialExpenses.filter((e) => e.groupId === activeGroup.id)
-    setExpenses(next)
-  }, [activeGroup.id, activeEvent?.id])
+  const { data: expenses = [] } = useQuery({
+    queryKey: ["expenses", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: () => getExpenses(activeGroup.id, activeEvent?.id),
+  })
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["expenses", activeGroup.id] })
+  const createMutation = useMutation({ mutationFn: createExpense, onSuccess: invalidate })
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Expense, "id" | "createdAt" | "updatedAt">> }) =>
+      updateExpense(id, data),
+    onSuccess: invalidate,
+  })
+  const deleteMutation = useMutation({ mutationFn: deleteExpense, onSuccess: invalidate })
 
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 
@@ -191,58 +198,39 @@ export function ExpenseList() {
     resetForm()
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     const parsed = parseFloat(amount)
     if (!title.trim() || isNaN(parsed) || parsed <= 0) return
 
-    if (editingId) {
-      setExpenses((prev) =>
-        prev.map((ex) =>
-          ex.id === editingId
-            ? {
-                ...ex,
-                title: title.trim(),
-                amount: parsed,
-                category,
-                icon: CATEGORY_ICONS[category] ?? "💰",
-                date,
-                recurring,
-                ...(eventId ? { eventId } : { eventId: undefined }),
-                ...(recurring
-                  ? { frequency, nextDate: computeNextDate(date, frequency) }
-                  : { frequency: undefined, nextDate: undefined }),
-                updatedAt: new Date().toISOString().slice(0, 10),
-              }
-            : ex
-        )
-      )
-    } else {
-      const now = new Date().toISOString().slice(0, 10)
-      const newExpense: Expense = {
-        id: `e${Date.now()}`,
-        title: title.trim(),
-        amount: parsed,
-        category,
-        icon: CATEGORY_ICONS[category] ?? "💰",
-        date,
-        recurring,
-        groupId: activeGroup.id,
-        ...(eventId ? { eventId } : {}),
-        ...(recurring
-          ? { frequency, nextDate: computeNextDate(date, frequency) }
-          : {}),
-        createdAt: now,
-        updatedAt: now,
-      }
-      setExpenses((prev) => [newExpense, ...prev])
+    const shared = {
+      title: title.trim(),
+      amount: parsed,
+      category,
+      icon: CATEGORY_ICONS[category] ?? "💰",
+      date,
+      recurring,
+      ...(eventId ? { eventId } : { eventId: undefined }),
+      ...(recurring
+        ? { frequency, nextDate: computeNextDate(date, frequency) }
+        : { frequency: undefined, nextDate: undefined }),
     }
 
-    closeForm()
+    if (editingId) {
+      const result = await updateMutation.mutateAsync({ id: editingId, data: shared })
+      if (result.success) closeForm()
+    } else {
+      const result = await createMutation.mutateAsync({
+        ...shared,
+        groupId: activeGroup.id,
+        ...(recurring ? {} : { frequency: undefined, nextDate: undefined }),
+      })
+      if (result.success) closeForm()
+    }
   }
 
-  function handleDelete(id: string) {
-    setExpenses((prev) => prev.filter((ex) => ex.id !== id))
+  async function handleDelete(id: string) {
+    await deleteMutation.mutateAsync(id)
     setDeleteId(null)
   }
 
@@ -563,14 +551,14 @@ export function ExpenseList() {
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => openEdit(expense)}
-                            className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                             aria-label="Edit expense"
                           >
                             <Pencil className="size-3.5" />
                           </button>
                           <button
                             onClick={() => setDeleteId(expense.id)}
-                            className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                             aria-label="Delete expense"
                           >
                             <Trash2 className="size-3.5" />

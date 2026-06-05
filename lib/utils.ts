@@ -15,6 +15,10 @@ export function formatCurrency(amount: number, currency: string, decimals = 2): 
   }).format(amount)
 }
 
+export function toDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
 export function getCurrencySymbol(currency: string): string {
   return (
     new Intl.NumberFormat(undefined, {

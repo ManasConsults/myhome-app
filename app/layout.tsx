@@ -3,7 +3,8 @@ import { Plus_Jakarta_Sans } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/providers/ThemeProvider"
 import { ThemeColorProvider } from "@/components/providers/ThemeColorProvider"
-import { AuthProvider } from "@/components/providers/AuthProvider"
+import { ReactQueryProvider } from "@/components/providers/ReactQueryProvider"
+import { SessionProvider } from "next-auth/react"
 
 const fontSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -23,14 +24,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
       className={fontSans.variable}
     >
-      <body className="min-h-screen bg-background antialiased font-sans">
-        <AuthProvider>
-          <ThemeProvider>
-            <ThemeColorProvider>
-              {children}
-            </ThemeColorProvider>
-          </ThemeProvider>
-        </AuthProvider>
+      <body className="min-h-dvh bg-background antialiased font-sans">
+        <SessionProvider>
+          <ReactQueryProvider>
+            <ThemeProvider>
+              <ThemeColorProvider>
+                {children}
+              </ThemeColorProvider>
+            </ThemeProvider>
+          </ReactQueryProvider>
+        </SessionProvider>
       </body>
     </html>
   )

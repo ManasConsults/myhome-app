@@ -2,24 +2,24 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AppLogoMark } from "@/components/ui/AppLogo"
-import { useAuth } from "@/components/providers/AuthProvider"
-import { findUserByEmail, registerUser, type DummyUser } from "@/lib/dummy-users"
+import { Clock, CheckCircle } from "lucide-react"
+import { registerAction } from "@/lib/actions/auth"
 
 export default function RegisterPage() {
-  const { setUser } = useAuth()
-  const router = useRouter()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
   const [error, setError] = useState("")
+  const [submitted, setSubmitted] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [loading, setLoading] = useState(false)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError("")
 
@@ -31,26 +31,67 @@ export default function RegisterPage() {
       setError("Passwords don't match.")
       return
     }
-    if (findUserByEmail(email)) {
-      setError("An account with this email already exists.")
+
+    setLoading(true)
+    const result = await registerAction({ name, email, password })
+    setLoading(false)
+
+    if (!result.success) {
+      setError(result.error)
       return
     }
+    setIsAdmin(result.isAdmin)
+    setSubmitted(true)
+  }
 
-    const newUser: DummyUser = {
-      id: `user-${Date.now()}`,
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      password,
-      role: "user",
-      createdAt: new Date().toISOString().slice(0, 10),
-    }
-    registerUser(newUser)
-    setUser({ userId: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role })
-    router.push("/")
+  if (submitted) {
+    return (
+      <div className="min-h-dvh bg-background flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="w-full max-w-sm flex flex-col items-center gap-6 text-center"
+        >
+          {isAdmin ? (
+            <>
+              <div className="size-16 rounded-2xl bg-success/10 flex items-center justify-center">
+                <CheckCircle className="size-8 text-success" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <h1 className="text-xl font-bold tracking-tight">Account created</h1>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Your admin account and a default household are ready.
+                  <br />
+                  Sign in to get started.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="size-16 rounded-2xl bg-warning/10 flex items-center justify-center">
+                <Clock className="size-8 text-warning" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <h1 className="text-xl font-bold tracking-tight">Request submitted</h1>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Your account is pending admin approval.
+                  <br />
+                  You&apos;ll be able to sign in once an admin approves your request.
+                </p>
+              </div>
+            </>
+          )}
+          <Link href="/login" className="text-sm text-primary hover:underline font-medium">
+            {isAdmin ? "Sign in →" : "Back to sign in"}
+          </Link>
+        </motion.div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-background flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -69,8 +110,9 @@ export default function RegisterPage() {
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Name</label>
+                <label htmlFor="name" className="text-sm font-medium">Name</label>
                 <input
+                  id="name"
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -82,8 +124,9 @@ export default function RegisterPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Email</label>
+                <label htmlFor="email" className="text-sm font-medium">Email</label>
                 <input
+                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -95,8 +138,9 @@ export default function RegisterPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Password</label>
+                <label htmlFor="password" className="text-sm font-medium">Password</label>
                 <input
+                  id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -108,8 +152,9 @@ export default function RegisterPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Confirm password</label>
+                <label htmlFor="confirm-password" className="text-sm font-medium">Confirm password</label>
                 <input
+                  id="confirm-password"
                   type="password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
@@ -124,6 +169,7 @@ export default function RegisterPage() {
                 {error && (
                   <motion.p
                     key="error"
+                    role="alert"
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
@@ -135,8 +181,8 @@ export default function RegisterPage() {
                 )}
               </AnimatePresence>
 
-              <Button type="submit" className="w-full mt-1">
-                Create account
+              <Button type="submit" className="w-full mt-1" disabled={loading}>
+                {loading ? "Creating account…" : "Create account"}
               </Button>
             </form>
           </CardContent>

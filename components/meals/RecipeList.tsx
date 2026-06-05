@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { recipes as defaultRecipes, type Recipe } from "@/lib/dummy-data"
+import { type Recipe } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 type SortKey = "name" | "prepTime" | "calories"
@@ -38,7 +38,7 @@ interface RecipeListProps {
 
 export function RecipeList({ data, onSave, onDelete }: RecipeListProps) {
   const formCardRef = useRef<HTMLDivElement>(null)
-  const source = data ?? defaultRecipes
+  const source = data ?? []
 
   const [sortBy, setSortBy] = useState<SortKey>("name")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
@@ -367,7 +367,7 @@ export function RecipeList({ data, onSave, onDelete }: RecipeListProps) {
                                   {onSave && (
                                     <button
                                       onClick={() => openEdit(recipe)}
-                                      className="flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                      className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                                       aria-label="Edit recipe"
                                     >
                                       <Pencil className="size-3" />
@@ -376,7 +376,7 @@ export function RecipeList({ data, onSave, onDelete }: RecipeListProps) {
                                   {onDelete && (
                                     <button
                                       onClick={() => setDeleteId(recipe.id)}
-                                      className="flex items-center justify-center size-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                      className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                                       aria-label="Delete recipe"
                                     >
                                       <Trash2 className="size-3" />

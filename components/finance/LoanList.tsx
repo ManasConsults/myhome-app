@@ -6,9 +6,9 @@ import { ChevronDown, Plus, X, User, Pencil, Trash2, ArrowUp, ArrowDown } from "
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { type Loan, type LoanRepayment } from "@/lib/dummy-data"
+import { type Loan, type LoanRepayment } from "@/lib/types"
 
-const TODAY = "2026-04-07"
+const TODAY = new Date().toISOString().slice(0, 10)
 
 type Tab = "all" | "lent" | "borrowed"
 type LoanStatus = "active" | "settled" | "overdue"
@@ -271,7 +271,7 @@ export function LoanList({ loans, repayments, currency, onAddRepayment, onEdit, 
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onEdit(loan) }}
-                        className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                         aria-label="Edit loan"
                       >
                         <Pencil className="size-3.5" />
@@ -279,7 +279,7 @@ export function LoanList({ loans, repayments, currency, onAddRepayment, onEdit, 
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setDeleteId(loan.id) }}
-                        className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                         aria-label="Delete loan"
                       >
                         <Trash2 className="size-3.5" />
@@ -330,7 +330,7 @@ export function LoanList({ loans, repayments, currency, onAddRepayment, onEdit, 
                       </div>
 
                       {loan.notes && (
-                        <p className="text-xs text-muted-foreground italic">"{loan.notes}"</p>
+                        <p className="text-xs text-muted-foreground italic">&quot;{loan.notes}&quot;</p>
                       )}
 
                       {/* Repayment history */}
