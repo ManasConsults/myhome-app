@@ -6,27 +6,15 @@ import { Plus, X, CheckCircle2, Circle, AlertCircle, ListTodo } from "lucide-rea
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { type Task } from "@/lib/types"
+import { type Task, type Category } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { TaskList } from "@/components/dashboard/TaskList"
 import { EventFilter } from "@/components/ui/EventFilter"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { getTasks, createTask, updateTask, deleteTask } from "@/lib/actions/tasks"
 
-const CATEGORY_ICONS: Record<string, string> = {
-  Chores: "🧹",
-  Bills: "💳",
-  Shopping: "🛒",
-  Maintenance: "🔧",
-  Health: "💊",
-  Personal: "👤",
-  Work: "💼",
-  Other: "📌",
-}
-
-const CATEGORIES = ["Chores", "Bills", "Shopping", "Maintenance", "Health", "Personal", "Work", "Other"]
-
-export function TasksSection() {
+export function TasksSection({ categories }: { categories: Category[] }) {
+  const iconMap = Object.fromEntries(categories.map((c) => [c.name, c.icon]))
   const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
   const queryClient = useQueryClient()
 
@@ -35,7 +23,7 @@ export function TasksSection() {
   const [editingId, setEditingId] = useState<string | null>(null)
 
   const [title, setTitle] = useState("")
-  const [category, setCategory] = useState("Chores")
+  const [category, setCategory] = useState(() => categories[0]?.name ?? "")
   const [priority, setPriority] = useState<"high" | "medium" | "low">("medium")
   const [due, setDue] = useState("")
   const [eventId, setEventId] = useState("")
@@ -76,7 +64,7 @@ export function TasksSection() {
 
   function resetForm() {
     setTitle("")
-    setCategory("Chores")
+    setCategory(categories[0]?.name ?? "")
     setPriority("medium")
     setDue(new Date().toISOString().slice(0, 10))
     setEventId(activeEvent?.id ?? "")
@@ -119,7 +107,7 @@ export function TasksSection() {
           category,
           priority,
           due,
-          icon: CATEGORY_ICONS[category] ?? "📌",
+          icon: iconMap[category] ?? "📌",
           ...(eventId ? { eventId } : { eventId: undefined }),
         },
       })
@@ -131,7 +119,7 @@ export function TasksSection() {
         priority,
         done: false,
         due,
-        icon: CATEGORY_ICONS[category] ?? "📌",
+        icon: iconMap[category] ?? "📌",
         groupId: activeGroup.id,
         ...(eventId ? { eventId } : {}),
       })
@@ -220,7 +208,7 @@ export function TasksSection() {
                       onChange={(e) => setCategory(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                     >
-                      {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                      {categories.map((c) => <option key={c.id} value={c.name}>{c.icon ? `${c.icon} ` : ""}{c.name}</option>)}
                     </select>
                   </div>
                   <div className="flex flex-col gap-1">

@@ -14,7 +14,7 @@ export default auth((req) => {
   const { pathname } = req.nextUrl
   const session = req.auth
 
-  if (pathname.startsWith("/admin")) {
+  if (pathname.startsWith("/admin") || pathname.startsWith("/settings/reference-data")) {
     if (!session) return NextResponse.redirect(new URL("/login", req.url))
     if (session.user.role !== "admin") return NextResponse.redirect(new URL("/", req.url))
     return NextResponse.next()

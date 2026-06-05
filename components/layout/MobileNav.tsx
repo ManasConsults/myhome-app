@@ -21,10 +21,12 @@ import {
   HandCoins,
   ChevronDown,
   User,
+  Database,
   type LucideIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AppLogoMark } from "@/components/ui/AppLogo"
+import { useAuth } from "@/components/providers/AuthProvider"
 
 type SubItem = { href: string; label: string; icon: LucideIcon }
 type NavItem  = { href: string; label: string; icon: LucideIcon; subItems?: SubItem[] }
@@ -47,16 +49,12 @@ const navItems: NavItem[] = [
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/notes", label: "Notes", icon: StickyNote },
   { href: "/meals", label: "Meals", icon: UtensilsCrossed },
-  {
-    href: "/settings",
-    label: "Settings",
-    icon: Settings,
-    subItems: [
-      { href: "/settings/profile", label: "Profile", icon: User },
-      { href: "/settings/groups", label: "Groups", icon: Home },
-      { href: "/settings/events", label: "Events", icon: CalendarDays },
-    ],
-  },
+]
+
+const BASE_SETTINGS_SUB: SubItem[] = [
+  { href: "/settings/profile", label: "Profile", icon: User },
+  { href: "/settings/groups", label: "Groups", icon: Home },
+  { href: "/settings/events", label: "Events", icon: CalendarDays },
 ]
 
 const STORAGE_KEY = "myhome-nav-expanded"
@@ -74,17 +72,34 @@ interface MobileNavProps {
 
 export function MobileNav({ open, onClose }: MobileNavProps) {
   const pathname = usePathname()
+  const { user } = useAuth()
+
+  const allNavItems: NavItem[] = [
+    ...navItems,
+    {
+      href: "/settings",
+      label: "Settings",
+      icon: Settings,
+      subItems: [
+        ...BASE_SETTINGS_SUB,
+        ...(user?.role === "admin"
+          ? [{ href: "/settings/reference-data", label: "Reference Data", icon: Database }]
+          : []),
+      ],
+    },
+  ]
+
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
-    defaultExpanded(navItems)
+    defaultExpanded(allNavItems)
   )
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) setExpanded({ ...defaultExpanded(navItems), ...JSON.parse(stored) })
+      if (stored) setExpanded({ ...defaultExpanded(allNavItems), ...JSON.parse(stored) })
     } catch {}
     // Auto-expand if on a sub-route
-    navItems.forEach((item) => {
+    allNavItems.forEach((item) => {
       if (item.subItems && window.location.pathname.startsWith(item.href + "/")) {
         setExpanded((prev) => {
           if (prev[item.href]) return prev
@@ -144,7 +159,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
             </div>
 
             <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5 overflow-y-auto">
-              {navItems.map((item) => {
+              {allNavItems.map((item) => {
                 const exactActive = pathname === item.href
                 const anySubActive = item.subItems?.some((s) => pathname === s.href) ?? false
                 const inSection = !!item.subItems && pathname.startsWith(item.href + "/")

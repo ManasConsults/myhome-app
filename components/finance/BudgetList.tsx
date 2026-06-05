@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { type Budget } from "@/lib/types"
+import { type Budget, type Category } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { getBudgets, createBudget, updateBudget, deleteBudget } from "@/lib/actions/finance"
@@ -22,18 +22,6 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "spent", label: "Spent" },
 ]
 
-const CATEGORIES = [
-  "Food & Dining",
-  "Utilities",
-  "Entertainment",
-  "Health & Fitness",
-  "Shopping",
-  "Transportation",
-  "Housing",
-  "Education",
-  "Travel",
-  "Personal Care",
-]
 
 function getStatusClasses(spent: number, amount: number) {
   const ratio = spent / amount
@@ -60,9 +48,8 @@ type FormState = {
   eventId: string
 }
 
-const EMPTY_FORM: FormState = { name: "", category: "Food & Dining", type: "monthly", amount: "", eventId: "" }
-
-export function BudgetList() {
+export function BudgetList({ expenseCategories }: { expenseCategories: Category[] }) {
+  const EMPTY_FORM: FormState = { name: "", category: expenseCategories[0]?.name ?? "", type: "monthly", amount: "", eventId: "" }
   const { activeGroup, activeEvent, events } = useGroup()
   const queryClient = useQueryClient()
   const currency = activeGroup.currency
@@ -272,7 +259,7 @@ export function BudgetList() {
                     onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
                     className="border border-input rounded-lg px-3 py-2 text-sm bg-background w-full focus:outline-none focus:ring-2 focus:ring-ring"
                   >
-                    {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                    {expenseCategories.map((c) => <option key={c.id} value={c.name}>{c.icon ? `${c.icon} ` : ""}{c.name}</option>)}
                   </select>
                 </div>
 

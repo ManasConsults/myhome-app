@@ -6,29 +6,15 @@ import { Plus, X, ShoppingCart, PackageCheck, DollarSign, Store } from "lucide-r
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { type ShoppingItem } from "@/lib/types"
+import { type ShoppingItem, type Category } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { ShoppingList } from "@/components/dashboard/ShoppingList"
 import { EventFilter } from "@/components/ui/EventFilter"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { getShoppingItems, createShoppingItem, updateShoppingItem, deleteShoppingItem } from "@/lib/actions/shopping"
 
-const CATEGORIES = ["Produce", "Dairy", "Meat", "Bakery", "Frozen", "Drinks", "Snacks", "Cleaning", "Personal Care", "Other"]
-
-const CATEGORY_ICONS: Record<string, string> = {
-  Produce: "🥦",
-  Dairy: "🥛",
-  Meat: "🥩",
-  Bakery: "🍞",
-  Frozen: "🧊",
-  Drinks: "🧃",
-  Snacks: "🍿",
-  Cleaning: "🧹",
-  "Personal Care": "🧴",
-  Other: "🛍️",
-}
-
-export function ShoppingSection() {
+export function ShoppingSection({ categories }: { categories: Category[] }) {
+  const iconMap = Object.fromEntries(categories.map((c) => [c.name, c.icon]))
   const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
   const queryClient = useQueryClient()
   const currency = activeGroup.currency
@@ -38,7 +24,7 @@ export function ShoppingSection() {
   const [editingId, setEditingId] = useState<string | null>(null)
 
   const [name, setName] = useState("")
-  const [category, setCategory] = useState("Produce")
+  const [category, setCategory] = useState(() => categories[0]?.name ?? "")
   const [quantity, setQuantity] = useState("1")
   const [unit, setUnit] = useState("pcs")
   const [price, setPrice] = useState("")
@@ -79,7 +65,7 @@ export function ShoppingSection() {
 
   function resetForm() {
     setName("")
-    setCategory("Produce")
+    setCategory(categories[0]?.name ?? "")
     setQuantity("1")
     setUnit("pcs")
     setPrice("")
@@ -128,7 +114,7 @@ export function ShoppingSection() {
           unit: unit.trim() || "pcs",
           estimatedPrice: parseFloat(price) || 0,
           store: store.trim(),
-          icon: CATEGORY_ICONS[category] ?? "🛍️",
+          icon: iconMap[category] ?? "🛍️",
           ...(eventId ? { eventId } : { eventId: undefined }),
         },
       })
@@ -142,7 +128,7 @@ export function ShoppingSection() {
         estimatedPrice: parseFloat(price) || 0,
         checked: false,
         store: store.trim(),
-        icon: CATEGORY_ICONS[category] ?? "🛍️",
+        icon: iconMap[category] ?? "🛍️",
         groupId: activeGroup.id,
         ...(eventId ? { eventId } : {}),
       })
@@ -242,7 +228,7 @@ export function ShoppingSection() {
                     onChange={(e) => setCategory(e.target.value)}
                     className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                   >
-                    {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    {categories.map((c) => <option key={c.id} value={c.name}>{c.icon ? `${c.icon} ` : ""}{c.name}</option>)}
                   </select>
                 </div>
 

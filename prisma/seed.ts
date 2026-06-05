@@ -293,6 +293,83 @@ async function main() {
     }
   }
 
+  // ── Categories (reference data) ───────────────────────────────────────────
+  type CatSeed = { domain: string; name: string; icon: string; color: string; sortOrder: number }
+  const categoryData: CatSeed[] = [
+    // expense (shared with budget)
+    { domain: "expense", name: "Food & Dining",   icon: "🍽️", color: "", sortOrder: 0 },
+    { domain: "expense", name: "Utilities",        icon: "⚡",  color: "", sortOrder: 1 },
+    { domain: "expense", name: "Entertainment",    icon: "🎭",  color: "", sortOrder: 2 },
+    { domain: "expense", name: "Health & Fitness", icon: "💪",  color: "", sortOrder: 3 },
+    { domain: "expense", name: "Shopping",         icon: "🛍️", color: "", sortOrder: 4 },
+    { domain: "expense", name: "Transportation",   icon: "🚗",  color: "", sortOrder: 5 },
+    { domain: "expense", name: "Housing",          icon: "🏠",  color: "", sortOrder: 6 },
+    { domain: "expense", name: "Education",        icon: "📚",  color: "", sortOrder: 7 },
+    { domain: "expense", name: "Travel",           icon: "✈️",  color: "", sortOrder: 8 },
+    { domain: "expense", name: "Personal Care",    icon: "💆",  color: "", sortOrder: 9 },
+    // income
+    { domain: "income", name: "Salary",             icon: "💼", color: "", sortOrder: 0 },
+    { domain: "income", name: "Freelance",           icon: "💻", color: "", sortOrder: 1 },
+    { domain: "income", name: "Rental Income",       icon: "🏠", color: "", sortOrder: 2 },
+    { domain: "income", name: "Investment",          icon: "📈", color: "", sortOrder: 3 },
+    { domain: "income", name: "Business Income",     icon: "🏢", color: "", sortOrder: 4 },
+    { domain: "income", name: "Government Benefits", icon: "🏛️", color: "", sortOrder: 5 },
+    { domain: "income", name: "Gift",                icon: "🎁", color: "", sortOrder: 6 },
+    { domain: "income", name: "Other",               icon: "💰", color: "", sortOrder: 7 },
+    // task
+    { domain: "task", name: "Chores",      icon: "🧹", color: "", sortOrder: 0 },
+    { domain: "task", name: "Bills",       icon: "💳", color: "", sortOrder: 1 },
+    { domain: "task", name: "Shopping",    icon: "🛒", color: "", sortOrder: 2 },
+    { domain: "task", name: "Maintenance", icon: "🔧", color: "", sortOrder: 3 },
+    { domain: "task", name: "Health",      icon: "💊", color: "", sortOrder: 4 },
+    { domain: "task", name: "Personal",    icon: "👤", color: "", sortOrder: 5 },
+    { domain: "task", name: "Work",        icon: "💼", color: "", sortOrder: 6 },
+    { domain: "task", name: "Other",       icon: "📌", color: "", sortOrder: 7 },
+    // shopping
+    { domain: "shopping", name: "Produce",       icon: "🥦", color: "", sortOrder: 0 },
+    { domain: "shopping", name: "Dairy",         icon: "🥛", color: "", sortOrder: 1 },
+    { domain: "shopping", name: "Meat",          icon: "🥩", color: "", sortOrder: 2 },
+    { domain: "shopping", name: "Bakery",        icon: "🍞", color: "", sortOrder: 3 },
+    { domain: "shopping", name: "Frozen",        icon: "🧊", color: "", sortOrder: 4 },
+    { domain: "shopping", name: "Drinks",        icon: "🧃", color: "", sortOrder: 5 },
+    { domain: "shopping", name: "Snacks",        icon: "🍿", color: "", sortOrder: 6 },
+    { domain: "shopping", name: "Cleaning",      icon: "🧹", color: "", sortOrder: 7 },
+    { domain: "shopping", name: "Personal Care", icon: "🧴", color: "", sortOrder: 8 },
+    { domain: "shopping", name: "Other",         icon: "🛍️", color: "", sortOrder: 9 },
+    // note (no icons)
+    { domain: "note", name: "General",  icon: "", color: "", sortOrder: 0 },
+    { domain: "note", name: "Home",     icon: "", color: "", sortOrder: 1 },
+    { domain: "note", name: "Finance",  icon: "", color: "", sortOrder: 2 },
+    { domain: "note", name: "Health",   icon: "", color: "", sortOrder: 3 },
+    { domain: "note", name: "Work",     icon: "", color: "", sortOrder: 4 },
+    { domain: "note", name: "Personal", icon: "", color: "", sortOrder: 5 },
+    { domain: "note", name: "Shopping", icon: "", color: "", sortOrder: 6 },
+    { domain: "note", name: "Travel",   icon: "", color: "", sortOrder: 7 },
+    { domain: "note", name: "Other",    icon: "", color: "", sortOrder: 8 },
+    // calendar (icon + dot color token)
+    { domain: "calendar", name: "appointment", icon: "📅", color: "primary",     sortOrder: 0 },
+    { domain: "calendar", name: "birthday",    icon: "🎂", color: "success",     sortOrder: 1 },
+    { domain: "calendar", name: "holiday",     icon: "🏖️", color: "success",     sortOrder: 2 },
+    { domain: "calendar", name: "reminder",    icon: "⏰", color: "warning",     sortOrder: 3 },
+    { domain: "calendar", name: "social",      icon: "🎉", color: "muted",       sortOrder: 4 },
+    // meal_tag (no icons)
+    { domain: "meal_tag", name: "Vegetarian",      icon: "", color: "", sortOrder: 0 },
+    { domain: "meal_tag", name: "Vegan",            icon: "", color: "", sortOrder: 1 },
+    { domain: "meal_tag", name: "Gluten-Free",      icon: "", color: "", sortOrder: 2 },
+    { domain: "meal_tag", name: "Quick",            icon: "", color: "", sortOrder: 3 },
+    { domain: "meal_tag", name: "High-Protein",     icon: "", color: "", sortOrder: 4 },
+    { domain: "meal_tag", name: "Budget-Friendly",  icon: "", color: "", sortOrder: 5 },
+    { domain: "meal_tag", name: "Family",           icon: "", color: "", sortOrder: 6 },
+    { domain: "meal_tag", name: "Meal-Prep",        icon: "", color: "", sortOrder: 7 },
+  ]
+  for (const c of categoryData) {
+    await prisma.category.upsert({
+      where: { domain_name: { domain: c.domain, name: c.name } },
+      update: {},
+      create: c,
+    })
+  }
+
   console.log("✅ Seed complete")
 }
 

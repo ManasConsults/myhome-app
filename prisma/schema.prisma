@@ -248,3 +248,17 @@ model DayMeals {
 
   @@unique([groupId, eventId, day])
 }
+
+model Category {
+  id        String   @id @default(cuid())
+  domain    String
+  name      String
+  icon      String   @default("")
+  color     String   @default("")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([domain, name])
+  @@index([domain, sortOrder])
+}

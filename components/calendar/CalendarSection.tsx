@@ -6,7 +6,7 @@ import { Plus, X, Calendar, CalendarDays, Clock, Cake } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { type CalendarEvent } from "@/lib/types"
+import { type CalendarEvent, type Category } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { CalendarGrid } from "@/components/calendar/CalendarGrid"
 import { UpcomingEvents } from "@/components/calendar/UpcomingEvents"
@@ -14,32 +14,15 @@ import { EventFilter } from "@/components/ui/EventFilter"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { getCalendarEvents, createCalendarEvent } from "@/lib/actions/calendar"
 
-const CATEGORIES: CalendarEvent["category"][] = ["appointment", "birthday", "holiday", "reminder", "social"]
-
-const CATEGORY_ICONS: Record<CalendarEvent["category"], string> = {
-  appointment: "📅",
-  birthday: "🎂",
-  holiday: "🏖️",
-  reminder: "⏰",
-  social: "🎉",
-}
-
-const CATEGORY_LABELS: Record<CalendarEvent["category"], string> = {
-  appointment: "Appointment",
-  birthday: "Birthday",
-  holiday: "Holiday",
-  reminder: "Reminder",
-  social: "Social",
-}
-
-export function CalendarSection() {
+export function CalendarSection({ categories }: { categories: Category[] }) {
+  const iconMap = Object.fromEntries(categories.map((c) => [c.name, c.icon]))
   const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
   const queryClient = useQueryClient()
 
   const [showForm, setShowForm] = useState(false)
   const [title, setTitle] = useState("")
   const [date, setDate] = useState("")
-  const [category, setCategory] = useState<CalendarEvent["category"]>("appointment")
+  const [category, setCategory] = useState(() => categories[0]?.name ?? "")
   const [allDay, setAllDay] = useState(true)
   const [time, setTime] = useState("09:00")
   const [eventId, setEventId] = useState("")
@@ -83,7 +66,7 @@ export function CalendarSection() {
       ...(!allDay && time ? { time } : {}),
       category,
       allDay,
-      icon: CATEGORY_ICONS[category],
+      icon: iconMap[category] ?? "📅",
       groupId: activeGroup.id,
       ...(eventId ? { eventId } : {}),
     })
@@ -91,7 +74,7 @@ export function CalendarSection() {
     if (result.success) {
       setTitle("")
       setDate(new Date().toISOString().slice(0, 10))
-      setCategory("appointment")
+      setCategory(categories[0]?.name ?? "")
       setAllDay(true)
       setTime("09:00")
       setEventId(activeEvent?.id ?? "")
@@ -181,11 +164,11 @@ export function CalendarSection() {
                     <label className="text-xs text-muted-foreground font-medium">Category</label>
                     <select
                       value={category}
-                      onChange={(e) => setCategory(e.target.value as CalendarEvent["category"])}
+                      onChange={(e) => setCategory(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                     >
-                      {CATEGORIES.map((c) => (
-                        <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.name}>{c.icon ? `${c.icon} ` : ""}{c.name.charAt(0).toUpperCase() + c.name.slice(1)}</option>
                       ))}
                     </select>
                   </div>
@@ -261,10 +244,10 @@ export function CalendarSection() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5">
         <div className="lg:col-span-2">
-          <CalendarGrid data={eventList} />
+          <CalendarGrid data={eventList} categories={categories} />
         </div>
         <div>
-          <UpcomingEvents data={eventList} />
+          <UpcomingEvents data={eventList} categories={categories} />
         </div>
       </div>
     </>

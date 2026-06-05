@@ -23,7 +23,7 @@ const MEAL_LABELS: Record<MealKey, string> = {
   dinner: "Dinner",
 }
 
-export function MealsSection() {
+export function MealsSection({ suggestedTags }: { suggestedTags: string[] }) {
   const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
   const queryClient = useQueryClient()
 
@@ -311,7 +311,7 @@ export function MealsSection() {
           <WeeklyPlanGrid data={planList} recipes={recipeList} onEdit={openEdit} onDelete={handleDelete} />
         </div>
         <div>
-          <RecipeList data={recipeList} onSave={handleRecipeSave} onDelete={handleRecipeDelete} />
+          <RecipeList data={recipeList} onSave={handleRecipeSave} onDelete={handleRecipeDelete} suggestedTags={suggestedTags} />
         </div>
       </div>
     </>

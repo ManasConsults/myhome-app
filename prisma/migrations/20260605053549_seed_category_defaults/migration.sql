@@ -1,0 +1,70 @@
+-- Seed default categories for all 7 domains.
+-- Uses ON CONFLICT DO NOTHING so re-running is safe.
+
+INSERT INTO "Category" (id, domain, name, icon, color, "sortOrder", "createdAt", "updatedAt") VALUES
+  -- expense (shared with budget)
+  (gen_random_uuid()::text, 'expense', 'Food & Dining',   '🍽️', '', 0, NOW(), NOW()),
+  (gen_random_uuid()::text, 'expense', 'Utilities',        '⚡',  '', 1, NOW(), NOW()),
+  (gen_random_uuid()::text, 'expense', 'Entertainment',    '🎭',  '', 2, NOW(), NOW()),
+  (gen_random_uuid()::text, 'expense', 'Health & Fitness', '💪',  '', 3, NOW(), NOW()),
+  (gen_random_uuid()::text, 'expense', 'Shopping',         '🛍️', '', 4, NOW(), NOW()),
+  (gen_random_uuid()::text, 'expense', 'Transportation',   '🚗',  '', 5, NOW(), NOW()),
+  (gen_random_uuid()::text, 'expense', 'Housing',          '🏠',  '', 6, NOW(), NOW()),
+  (gen_random_uuid()::text, 'expense', 'Education',        '📚',  '', 7, NOW(), NOW()),
+  (gen_random_uuid()::text, 'expense', 'Travel',           '✈️',  '', 8, NOW(), NOW()),
+  (gen_random_uuid()::text, 'expense', 'Personal Care',    '💆',  '', 9, NOW(), NOW()),
+  -- income
+  (gen_random_uuid()::text, 'income', 'Salary',             '💼',  '', 0, NOW(), NOW()),
+  (gen_random_uuid()::text, 'income', 'Freelance',           '💻',  '', 1, NOW(), NOW()),
+  (gen_random_uuid()::text, 'income', 'Rental Income',       '🏠',  '', 2, NOW(), NOW()),
+  (gen_random_uuid()::text, 'income', 'Investment',          '📈',  '', 3, NOW(), NOW()),
+  (gen_random_uuid()::text, 'income', 'Business Income',     '🏢',  '', 4, NOW(), NOW()),
+  (gen_random_uuid()::text, 'income', 'Government Benefits', '🏛️', '', 5, NOW(), NOW()),
+  (gen_random_uuid()::text, 'income', 'Gift',                '🎁',  '', 6, NOW(), NOW()),
+  (gen_random_uuid()::text, 'income', 'Other',               '💰',  '', 7, NOW(), NOW()),
+  -- task
+  (gen_random_uuid()::text, 'task', 'Chores',      '🧹', '', 0, NOW(), NOW()),
+  (gen_random_uuid()::text, 'task', 'Bills',       '💳', '', 1, NOW(), NOW()),
+  (gen_random_uuid()::text, 'task', 'Shopping',    '🛒', '', 2, NOW(), NOW()),
+  (gen_random_uuid()::text, 'task', 'Maintenance', '🔧', '', 3, NOW(), NOW()),
+  (gen_random_uuid()::text, 'task', 'Health',      '💊', '', 4, NOW(), NOW()),
+  (gen_random_uuid()::text, 'task', 'Personal',    '👤', '', 5, NOW(), NOW()),
+  (gen_random_uuid()::text, 'task', 'Work',        '💼', '', 6, NOW(), NOW()),
+  (gen_random_uuid()::text, 'task', 'Other',       '📌', '', 7, NOW(), NOW()),
+  -- shopping
+  (gen_random_uuid()::text, 'shopping', 'Produce',       '🥦', '', 0, NOW(), NOW()),
+  (gen_random_uuid()::text, 'shopping', 'Dairy',         '🥛', '', 1, NOW(), NOW()),
+  (gen_random_uuid()::text, 'shopping', 'Meat',          '🥩', '', 2, NOW(), NOW()),
+  (gen_random_uuid()::text, 'shopping', 'Bakery',        '🍞', '', 3, NOW(), NOW()),
+  (gen_random_uuid()::text, 'shopping', 'Frozen',        '🧊', '', 4, NOW(), NOW()),
+  (gen_random_uuid()::text, 'shopping', 'Drinks',        '🧃', '', 5, NOW(), NOW()),
+  (gen_random_uuid()::text, 'shopping', 'Snacks',        '🍿', '', 6, NOW(), NOW()),
+  (gen_random_uuid()::text, 'shopping', 'Cleaning',      '🧹', '', 7, NOW(), NOW()),
+  (gen_random_uuid()::text, 'shopping', 'Personal Care', '🧴', '', 8, NOW(), NOW()),
+  (gen_random_uuid()::text, 'shopping', 'Other',         '🛍️', '', 9, NOW(), NOW()),
+  -- note (no icons)
+  (gen_random_uuid()::text, 'note', 'General',  '', '', 0, NOW(), NOW()),
+  (gen_random_uuid()::text, 'note', 'Home',     '', '', 1, NOW(), NOW()),
+  (gen_random_uuid()::text, 'note', 'Finance',  '', '', 2, NOW(), NOW()),
+  (gen_random_uuid()::text, 'note', 'Health',   '', '', 3, NOW(), NOW()),
+  (gen_random_uuid()::text, 'note', 'Work',     '', '', 4, NOW(), NOW()),
+  (gen_random_uuid()::text, 'note', 'Personal', '', '', 5, NOW(), NOW()),
+  (gen_random_uuid()::text, 'note', 'Shopping', '', '', 6, NOW(), NOW()),
+  (gen_random_uuid()::text, 'note', 'Travel',   '', '', 7, NOW(), NOW()),
+  (gen_random_uuid()::text, 'note', 'Other',    '', '', 8, NOW(), NOW()),
+  -- calendar (icon + dot color token)
+  (gen_random_uuid()::text, 'calendar', 'appointment', '📅', 'primary', 0, NOW(), NOW()),
+  (gen_random_uuid()::text, 'calendar', 'birthday',    '🎂', 'success', 1, NOW(), NOW()),
+  (gen_random_uuid()::text, 'calendar', 'holiday',     '🏖️', 'success', 2, NOW(), NOW()),
+  (gen_random_uuid()::text, 'calendar', 'reminder',    '⏰', 'warning', 3, NOW(), NOW()),
+  (gen_random_uuid()::text, 'calendar', 'social',      '🎉', 'muted',   4, NOW(), NOW()),
+  -- meal_tag (no icons)
+  (gen_random_uuid()::text, 'meal_tag', 'Vegetarian',     '', '', 0, NOW(), NOW()),
+  (gen_random_uuid()::text, 'meal_tag', 'Vegan',           '', '', 1, NOW(), NOW()),
+  (gen_random_uuid()::text, 'meal_tag', 'Gluten-Free',     '', '', 2, NOW(), NOW()),
+  (gen_random_uuid()::text, 'meal_tag', 'Quick',           '', '', 3, NOW(), NOW()),
+  (gen_random_uuid()::text, 'meal_tag', 'High-Protein',    '', '', 4, NOW(), NOW()),
+  (gen_random_uuid()::text, 'meal_tag', 'Budget-Friendly', '', '', 5, NOW(), NOW()),
+  (gen_random_uuid()::text, 'meal_tag', 'Family',          '', '', 6, NOW(), NOW()),
+  (gen_random_uuid()::text, 'meal_tag', 'Meal-Prep',       '', '', 7, NOW(), NOW())
+ON CONFLICT (domain, name) DO NOTHING;
