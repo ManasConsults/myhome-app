@@ -3,10 +3,11 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
+import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AppLogoMark } from "@/components/ui/AppLogo"
-import { Clock, CheckCircle } from "lucide-react"
+import { Clock, CheckCircle, Github } from "lucide-react"
 import { registerAction } from "@/lib/actions/auth"
 
 export default function RegisterPage() {
@@ -18,6 +19,7 @@ export default function RegisterPage() {
   const [submitted, setSubmitted] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [githubLoading, setGithubLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -181,10 +183,30 @@ export default function RegisterPage() {
                 )}
               </AnimatePresence>
 
-              <Button type="submit" className="w-full mt-1" disabled={loading}>
+              <Button type="submit" className="w-full mt-1" disabled={loading || githubLoading}>
                 {loading ? "Creating account…" : "Create account"}
               </Button>
             </form>
+
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">or</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={loading || githubLoading}
+              onClick={() => {
+                setGithubLoading(true)
+                signIn("github", { callbackUrl: "/" })
+              }}
+            >
+              <Github data-icon />
+              {githubLoading ? "Redirecting…" : "Continue with GitHub"}
+            </Button>
           </CardContent>
         </Card>
 

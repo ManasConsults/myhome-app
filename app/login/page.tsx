@@ -8,7 +8,16 @@ import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AppLogoMark } from "@/components/ui/AppLogo"
+import { Github } from "lucide-react"
 import { getLoginBlockReason } from "@/lib/actions/auth"
+
+function oauthErrorMessage(error: string | null): string {
+  if (error === "OAuthPending") return "Your account is awaiting admin approval."
+  if (error === "OAuthRejected") return "Your account request was not approved. Contact the admin."
+  if (error === "CredentialsSignin") return "Invalid email or password."
+  if (error) return "Invalid email or password."
+  return ""
+}
 
 function LoginForm() {
   const searchParams = useSearchParams()
@@ -16,12 +25,11 @@ function LoginForm() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [githubLoading, setGithubLoading] = useState(false)
 
-  // Auth.js v5 redirects to /login?error=CredentialsSignin on failed credentials
   useEffect(() => {
-    if (searchParams.get("error")) {
-      setError("Invalid email or password.")
-    }
+    const msg = oauthErrorMessage(searchParams.get("error"))
+    if (msg) setError(msg)
   }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -110,10 +118,30 @@ function LoginForm() {
                 )}
               </AnimatePresence>
 
-              <Button type="submit" className="w-full mt-1" disabled={loading}>
+              <Button type="submit" className="w-full mt-1" disabled={loading || githubLoading}>
                 {loading ? "Signing in…" : "Sign in"}
               </Button>
             </form>
+
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">or</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={loading || githubLoading}
+              onClick={() => {
+                setGithubLoading(true)
+                signIn("github", { callbackUrl: "/" })
+              }}
+            >
+              <Github data-icon />
+              {githubLoading ? "Redirecting…" : "Continue with GitHub"}
+            </Button>
           </CardContent>
         </Card>
 
