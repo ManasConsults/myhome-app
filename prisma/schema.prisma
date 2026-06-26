@@ -7,15 +7,24 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String?
-  role      String   @default("user")
-  status    String   @default("active")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  groups    Group[]
+  id               String        @id @default(cuid())
+  name             String
+  email            String        @unique
+  password         String?
+  role             String        @default("user")
+  status           String        @default("active")
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  groups           Group[]
+  eventMemberships EventMember[]
+  createdExpenses  Expense[]     @relation("ExpenseCreatedBy")
+  createdIncomes   Income[]      @relation("IncomeCreatedBy")
+  createdLoans     Loan[]        @relation("LoanCreatedBy")
+  createdTasks     Task[]        @relation("TaskCreatedBy")
+  createdShoppingItems ShoppingItem[] @relation("ShoppingItemCreatedBy")
+  createdShoppingLists ShoppingList[] @relation("ShoppingListCreatedBy")
+  createdNotes     Note[]        @relation("NoteCreatedBy")
+  createdCalendarEvents CalendarEvent[] @relation("CalendarEventCreatedBy")
 }
 
 model Group {
@@ -39,6 +48,7 @@ model Group {
   loans         Loan[]
   tasks         Task[]
   shoppingItems ShoppingItem[]
+  shoppingLists ShoppingList[]
   notes         Note[]
   calendarEvents CalendarEvent[]
   dayMeals      DayMeals[]
@@ -56,15 +66,28 @@ model AppEvent {
   endDate       DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  members       EventMember[]
   budgets       Budget[]
   expenses      Expense[]
   incomes       Income[]
   loans         Loan[]
   tasks         Task[]
   shoppingItems ShoppingItem[]
+  shoppingLists ShoppingList[]
   notes         Note[]
   calendarEvents CalendarEvent[]
   dayMeals      DayMeals[]
+}
+
+model EventMember {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     AppEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, userId])
 }
 
 model Budget {
@@ -101,10 +124,12 @@ model Expense {
   group     Group     @relation(fields: [groupId], references: [id])
   eventId   String?
   event     AppEvent? @relation(fields: [eventId], references: [id])
-  budgetId  String?
-  budget    Budget?   @relation(fields: [budgetId], references: [id])
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  budgetId   String?
+  budget     Budget?   @relation(fields: [budgetId], references: [id])
+  createdBy  String?
+  creator    User?     @relation("ExpenseCreatedBy", fields: [createdBy], references: [id])
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 model Income {
@@ -121,6 +146,8 @@ model Income {
   group     Group     @relation(fields: [groupId], references: [id])
   eventId   String?
   event     AppEvent? @relation(fields: [eventId], references: [id])
+  createdBy String?
+  creator   User?     @relation("IncomeCreatedBy", fields: [createdBy], references: [id])
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -138,6 +165,8 @@ model Loan {
   group        Group           @relation(fields: [groupId], references: [id])
   eventId      String?
   event        AppEvent?       @relation(fields: [eventId], references: [id])
+  createdBy    String?
+  creator      User?           @relation("LoanCreatedBy", fields: [createdBy], references: [id])
   repayments   LoanRepayment[]
   advances     LoanAdvance[]
   createdAt    DateTime        @default(now())
@@ -178,26 +207,46 @@ model Task {
   group     Group     @relation(fields: [groupId], references: [id])
   eventId   String?
   event     AppEvent? @relation(fields: [eventId], references: [id])
+  createdBy String?
+  creator   User?     @relation("TaskCreatedBy", fields: [createdBy], references: [id])
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
 
+model ShoppingList {
+  id        String         @id @default(cuid())
+  name      String
+  groupId   String
+  group     Group          @relation(fields: [groupId], references: [id])
+  eventId   String?
+  event     AppEvent?      @relation(fields: [eventId], references: [id])
+  createdBy String?
+  creator   User?          @relation("ShoppingListCreatedBy", fields: [createdBy], references: [id])
+  items     ShoppingItem[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
 model ShoppingItem {
-  id             String    @id @default(cuid())
+  id             String        @id @default(cuid())
   name           String
   category       String
   quantity       Float
   unit           String
-  estimatedPrice Float     @default(0)
-  checked        Boolean   @default(false)
+  estimatedPrice Float         @default(0)
+  checked        Boolean       @default(false)
   store          String
   icon           String
   groupId        String
-  group          Group     @relation(fields: [groupId], references: [id])
+  group          Group         @relation(fields: [groupId], references: [id])
   eventId        String?
-  event          AppEvent? @relation(fields: [eventId], references: [id])
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  event          AppEvent?     @relation(fields: [eventId], references: [id])
+  listId         String?
+  list           ShoppingList? @relation(fields: [listId], references: [id], onDelete: Cascade)
+  createdBy      String?
+  creator        User?         @relation("ShoppingItemCreatedBy", fields: [createdBy], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model Note {
@@ -211,6 +260,8 @@ model Note {
   group     Group     @relation(fields: [groupId], references: [id])
   eventId   String?
   event     AppEvent? @relation(fields: [eventId], references: [id])
+  createdBy String?
+  creator   User?     @relation("NoteCreatedBy", fields: [createdBy], references: [id])
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -227,6 +278,8 @@ model CalendarEvent {
   group     Group     @relation(fields: [groupId], references: [id])
   eventId   String?
   event     AppEvent? @relation(fields: [eventId], references: [id])
+  createdBy String?
+  creator   User?     @relation("CalendarEventCreatedBy", fields: [createdBy], references: [id])
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }

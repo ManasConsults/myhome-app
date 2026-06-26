@@ -46,6 +46,22 @@ export type AppEvent = {
   updatedAt: string
 }
 
+export type SharedEvent = AppEvent & {
+  sharedByName: string
+  groupName: string
+  groupCurrency: string
+  groupIcon: string
+}
+
+export type EventMember = {
+  id: string
+  eventId: string
+  userId: string
+  userName: string
+  userEmail: string
+  createdAt: string
+}
+
 export type Task = {
   id: string
   title: string
@@ -56,6 +72,7 @@ export type Task = {
   icon: string
   groupId: string
   eventId?: string
+  createdBy?: string
   createdAt: string
   updatedAt: string
 }
@@ -90,6 +107,7 @@ export type Expense = {
   budgetId?: string
   groupId: string
   eventId?: string
+  createdBy?: string
   createdAt: string
   updatedAt: string
 }
@@ -106,6 +124,7 @@ export type Income = {
   nextDate?: string
   groupId: string
   eventId?: string
+  createdBy?: string
   createdAt: string
   updatedAt: string
 }
@@ -121,6 +140,7 @@ export type Loan = {
   notes?: string
   groupId: string
   eventId?: string
+  createdBy?: string
   createdAt: string
   updatedAt: string
 }
@@ -145,6 +165,19 @@ export type LoanRepayment = {
   updatedAt: string
 }
 
+export type ShoppingList = {
+  id: string
+  name: string
+  groupId: string
+  eventId?: string
+  createdBy?: string
+  itemCount: number
+  checkedCount: number
+  estimatedTotal: number
+  createdAt: string
+  updatedAt: string
+}
+
 export type ShoppingItem = {
   id: string
   name: string
@@ -157,6 +190,8 @@ export type ShoppingItem = {
   icon: string
   groupId: string
   eventId?: string
+  listId?: string
+  createdBy?: string
   createdAt: string
   updatedAt: string
 }
@@ -171,6 +206,7 @@ export type CalendarEvent = {
   icon: string
   groupId: string
   eventId?: string
+  createdBy?: string
   createdAt: string
   updatedAt: string
 }
@@ -186,6 +222,7 @@ export type Note = {
   updatedAt: string
   groupId: string
   eventId?: string
+  createdBy?: string
 }
 
 export type Recipe = {

@@ -8,10 +8,12 @@ import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
 import { type Loan, type LoanAdvance, type LoanRepayment } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
+import { useAuth } from "@/components/providers/AuthProvider"
 import { LoanList } from "@/components/finance/LoanList"
 import { EventFilter } from "@/components/ui/EventFilter"
+import { SharedEventBanner } from "@/components/layout/SharedEventBanner"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getLoans, createLoan, updateLoan, deleteLoan, getRepaymentsByGroup, createRepayment, getAdvancesByGroup, createAdvance } from "@/lib/actions/finance"
+import { getLoans, getLoansByEvent, createLoan, updateLoan, deleteLoan, getRepaymentsByGroup, createRepayment, getAdvancesByGroup, createAdvance } from "@/lib/actions/finance"
 
 function calcOutstanding(loan: Loan, repayments: LoanRepayment[], advances: LoanAdvance[]) {
   const today = new Date().toISOString().slice(0, 10)
@@ -29,7 +31,8 @@ function isOverdue(loan: Loan, outstanding: number) {
 }
 
 export function LoansSection() {
-  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events, isSharedEvent, activeEventGroupId } = useGroup()
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const currency = activeGroup.currency
 
@@ -50,21 +53,30 @@ export function LoansSection() {
   useEffect(() => { setEventId(activeEvent?.id ?? "") }, [activeEvent?.id])
 
   const { data: loanList = [] } = useQuery({
-    queryKey: ["loans", activeGroup.id, activeEvent?.id ?? null],
-    queryFn: () => getLoans(activeGroup.id, activeEvent?.id),
+    queryKey: isSharedEvent && activeEvent
+      ? ["loans", "event", activeEvent.id]
+      : ["loans", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: isSharedEvent && activeEvent
+      ? () => getLoansByEvent(activeEvent.id)
+      : () => getLoans(activeGroup.id, activeEvent?.id),
   })
 
   const { data: repayments = [] } = useQuery({
     queryKey: ["repayments", activeGroup.id],
     queryFn: () => getRepaymentsByGroup(activeGroup.id),
+    enabled: !isSharedEvent,
   })
 
   const { data: advances = [] } = useQuery({
     queryKey: ["advances", activeGroup.id],
     queryFn: () => getAdvancesByGroup(activeGroup.id),
+    enabled: !isSharedEvent,
   })
 
-  const invalidateLoans = () => queryClient.invalidateQueries({ queryKey: ["loans", activeGroup.id] })
+  const loansQueryKey = isSharedEvent && activeEvent
+    ? ["loans", "event", activeEvent.id]
+    : ["loans", activeGroup.id, activeEvent?.id ?? null]
+  const invalidateLoans = () => queryClient.invalidateQueries({ queryKey: loansQueryKey })
   const invalidateRepayments = () => queryClient.invalidateQueries({ queryKey: ["repayments", activeGroup.id] })
   const invalidateAdvances = () => queryClient.invalidateQueries({ queryKey: ["advances", activeGroup.id] })
 
@@ -156,19 +168,23 @@ export function LoansSection() {
       startDate,
       ...(dueDate ? { dueDate } : { dueDate: undefined }),
       ...(notes.trim() ? { notes: notes.trim() } : { notes: undefined }),
-      ...(eventId ? { eventId } : { eventId: undefined }),
+      ...(isSharedEvent && activeEvent ? { eventId: activeEvent.id } : eventId ? { eventId } : { eventId: undefined }),
     }
 
     if (editingId) {
       const result = await updateMutation.mutateAsync({ id: editingId, data: shared })
       if (result.success) closeForm()
     } else {
-      const result = await createMutation.mutateAsync({ ...shared, groupId: activeGroup.id })
+      const result = await createMutation.mutateAsync({ ...shared, groupId: activeEventGroupId })
       if (result.success) closeForm()
     }
   }
 
   async function handleDelete(id: string) {
+    if (isSharedEvent) {
+      const loan = loanList.find((l) => l.id === id)
+      if (loan?.createdBy !== user?.id) return
+    }
     await deleteMutation.mutateAsync(id)
   }
 
@@ -198,12 +214,16 @@ export function LoansSection() {
         ))}
       </div>
 
-      {groupEvents.length > 0 && (
-        <EventFilter
-          events={groupEvents}
-          activeEvent={activeEvent}
-          onSelect={(id) => id ? setActiveEvent(id) : clearActiveEvent()}
-        />
+      {isSharedEvent ? (
+        <SharedEventBanner />
+      ) : (
+        groupEvents.length > 0 && (
+          <EventFilter
+            events={groupEvents}
+            activeEvent={activeEvent}
+            onSelect={(id) => id ? setActiveEvent(id) : clearActiveEvent()}
+          />
+        )
       )}
 
       <Card ref={formCardRef} className="border-border/60">
@@ -261,10 +281,11 @@ export function LoansSection() {
                 {/* Contact + Principal */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">
+                    <label htmlFor="loan-contact" className="text-xs text-muted-foreground font-medium">
                       {direction === "lent" ? "Lent to" : "Borrowed from"}
                     </label>
                     <input
+                      id="loan-contact"
                       type="text"
                       placeholder="Contact name"
                       value={contact}
@@ -274,11 +295,13 @@ export function LoansSection() {
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Amount</label>
+                    <label htmlFor="loan-amount" className="text-xs text-muted-foreground font-medium">Amount</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">{getCurrencySymbol(currency)}</span>
                       <input
+                        id="loan-amount"
                         type="number"
+                        inputMode="decimal"
                         min="0.01"
                         step="0.01"
                         placeholder="0.00"
@@ -294,9 +317,11 @@ export function LoansSection() {
                 {/* Interest rate + Start date + Due date */}
                 <div className="grid grid-cols-3 gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Interest (% p.a.)</label>
+                    <label htmlFor="loan-interest" className="text-xs text-muted-foreground font-medium">Interest (% p.a.)</label>
                     <input
+                      id="loan-interest"
                       type="number"
+                      inputMode="decimal"
                       min="0"
                       step="0.1"
                       placeholder="0"
@@ -306,8 +331,9 @@ export function LoansSection() {
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Start date</label>
+                    <label htmlFor="loan-start" className="text-xs text-muted-foreground font-medium">Start date</label>
                     <input
+                      id="loan-start"
                       type="date"
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
@@ -316,8 +342,9 @@ export function LoansSection() {
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Due date (opt.)</label>
+                    <label htmlFor="loan-due" className="text-xs text-muted-foreground font-medium">Due date (opt.)</label>
                     <input
+                      id="loan-due"
                       type="date"
                       value={dueDate}
                       onChange={(e) => setDueDate(e.target.value)}
@@ -328,8 +355,9 @@ export function LoansSection() {
 
                 {/* Notes */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-muted-foreground font-medium">Notes (optional)</label>
+                  <label htmlFor="loan-notes" className="text-xs text-muted-foreground font-medium">Notes (optional)</label>
                   <input
+                    id="loan-notes"
                     type="text"
                     placeholder="e.g. For car repairs"
                     value={notes}
@@ -339,10 +367,11 @@ export function LoansSection() {
                 </div>
 
                 {/* Event (optional) */}
-                {groupEvents.length > 0 && (
+                {!isSharedEvent && groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
+                    <label htmlFor="loan-event" className="text-xs text-muted-foreground font-medium">Event (optional)</label>
                     <select
+                      id="loan-event"
                       value={eventId}
                       onChange={(e) => setEventId(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"

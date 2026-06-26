@@ -5,14 +5,17 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useAuth } from "@/components/providers/AuthProvider"
 import { getGroups } from "@/lib/actions/groups"
-import { getEventsByUser } from "@/lib/actions/events"
-import type { Group, AppEvent } from "@/lib/types"
+import { getEventsByUser, getSharedEventsByUser } from "@/lib/actions/events"
+import type { Group, AppEvent, SharedEvent } from "@/lib/types"
 
 type GroupContextValue = {
   groups: Group[]
   events: AppEvent[]
+  sharedEvents: SharedEvent[]
   activeGroup: Group
   activeEvent: AppEvent | null
+  isSharedEvent: boolean
+  activeEventGroupId: string
   setActiveGroup: (id: string) => void
   setActiveEvent: (id: string) => void
   clearActiveEvent: () => void
@@ -36,19 +39,26 @@ export function GroupProvider({ children }: { children: ReactNode }) {
     enabled: !!userId,
   })
 
+  const { data: sharedEvents = [] } = useQuery({
+    queryKey: ["shared-events", userId],
+    queryFn: () => getSharedEventsByUser(),
+    enabled: !!userId,
+  })
+
   const [activeGroupId, setActiveGroupIdState] = useState<string | null>(null)
   const [activeEventId, setActiveEventIdState] = useState<string | null>(null)
 
   // Hydrate active group/event from localStorage once groups are loaded
   useEffect(() => {
     if (groups.length === 0) return
+    const allEvents = [...events, ...sharedEvents]
     try {
       const storedGroup = localStorage.getItem("myhome-active-group")
       const valid = groups.find((g) => g.id === storedGroup)
       setActiveGroupIdState(valid ? valid.id : groups[0].id)
 
       const storedEvent = localStorage.getItem("myhome-active-event")
-      if (storedEvent && events.find((e) => e.id === storedEvent)) {
+      if (storedEvent && allEvents.find((e) => e.id === storedEvent)) {
         setActiveEventIdState(storedEvent)
       } else {
         setActiveEventIdState(null)
@@ -56,7 +66,7 @@ export function GroupProvider({ children }: { children: ReactNode }) {
     } catch {
       setActiveGroupIdState(groups[0].id)
     }
-  }, [groups, events])
+  }, [groups, events, sharedEvents])
 
   function setActiveGroup(id: string) {
     setActiveGroupIdState(id)
@@ -68,14 +78,25 @@ export function GroupProvider({ children }: { children: ReactNode }) {
   }
 
   function setActiveEvent(id: string) {
-    const ev = events.find((e) => e.id === id)
-    if (!ev) return
-    setActiveEventIdState(id)
-    setActiveGroupIdState(ev.groupId)
-    try {
-      localStorage.setItem("myhome-active-event", id)
-      localStorage.setItem("myhome-active-group", ev.groupId)
-    } catch {}
+    // Check owned events first
+    const ownedEv = events.find((e) => e.id === id)
+    if (ownedEv) {
+      setActiveEventIdState(id)
+      setActiveGroupIdState(ownedEv.groupId)
+      try {
+        localStorage.setItem("myhome-active-event", id)
+        localStorage.setItem("myhome-active-group", ownedEv.groupId)
+      } catch {}
+      return
+    }
+    // Shared event — don't switch activeGroup
+    const sharedEv = sharedEvents.find((e) => e.id === id)
+    if (sharedEv) {
+      setActiveEventIdState(id)
+      try {
+        localStorage.setItem("myhome-active-event", id)
+      } catch {}
+    }
   }
 
   function clearActiveEvent() {
@@ -84,7 +105,12 @@ export function GroupProvider({ children }: { children: ReactNode }) {
   }
 
   const activeGroup = groups.find((g) => g.id === activeGroupId) ?? groups[0]
-  const activeEvent = events.find((e) => e.id === activeEventId) ?? null
+  const allEvents = [...events, ...sharedEvents]
+  const activeEvent = allEvents.find((e) => e.id === activeEventId) ?? null
+  const isSharedEvent = activeEvent !== null && sharedEvents.some((e) => e.id === activeEvent.id)
+  const activeEventGroupId = isSharedEvent
+    ? (activeEvent as SharedEvent).groupId
+    : activeGroup?.id ?? ""
 
   // Still fetching — don't render yet (avoids flash of no-group state)
   if (groupsPending && !!userId) return null
@@ -114,8 +140,11 @@ export function GroupProvider({ children }: { children: ReactNode }) {
     <GroupContext.Provider value={{
       groups,
       events,
+      sharedEvents,
       activeGroup,
       activeEvent,
+      isSharedEvent,
+      activeEventGroupId,
       setActiveGroup,
       setActiveEvent,
       clearActiveEvent,

@@ -87,6 +87,12 @@ export async function approveUser(userId: string): Promise<{ success: boolean }>
   await requireAdmin()
   try {
     await prisma.user.update({ where: { id: userId }, data: { status: "active" } })
+    const groupCount = await prisma.group.count({ where: { userId } })
+    if (groupCount === 0) {
+      await prisma.group.create({
+        data: { name: "My Home", icon: "🏠", color: "primary", currency: "USD", isDefault: true, userId },
+      })
+    }
     return { success: true }
   } catch { return { success: false } }
 }

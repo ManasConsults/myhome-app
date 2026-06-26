@@ -11,8 +11,9 @@ import { useGroup } from "@/components/providers/GroupProvider"
 import { WeeklyPlanGrid } from "@/components/meals/WeeklyPlanGrid"
 import { RecipeList } from "@/components/meals/RecipeList"
 import { EventFilter } from "@/components/ui/EventFilter"
+import { SharedEventBanner } from "@/components/layout/SharedEventBanner"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getRecipes, createRecipe, updateRecipe, deleteRecipe, getMealPlan, upsertDayMeals, deleteDayMeals } from "@/lib/actions/meals"
+import { getRecipes, createRecipe, updateRecipe, deleteRecipe, getMealPlan, getMealPlanByEvent, upsertDayMeals, deleteDayMeals } from "@/lib/actions/meals"
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 type MealKey = "breakfast" | "lunch" | "dinner"
@@ -24,7 +25,7 @@ const MEAL_LABELS: Record<MealKey, string> = {
 }
 
 export function MealsSection({ suggestedTags }: { suggestedTags: string[] }) {
-  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events, isSharedEvent, activeEventGroupId } = useGroup()
   const queryClient = useQueryClient()
 
   const formCardRef = useRef<HTMLDivElement>(null)
@@ -38,7 +39,7 @@ export function MealsSection({ suggestedTags }: { suggestedTags: string[] }) {
 
   useEffect(() => { setEventId(activeEvent?.id ?? "") }, [activeEvent?.id])
 
-  const groupId = activeGroup.id
+  const groupId = activeEventGroupId
   const activeEventId = activeEvent?.id ?? null
 
   const { data: recipeList = [] } = useQuery<Recipe[]>({
@@ -47,11 +48,18 @@ export function MealsSection({ suggestedTags }: { suggestedTags: string[] }) {
   })
 
   const { data: planList = [] } = useQuery<DayMeals[]>({
-    queryKey: ["mealPlan", groupId, activeEventId],
-    queryFn: () => getMealPlan(groupId, activeEvent?.id),
+    queryKey: isSharedEvent && activeEvent
+      ? ["mealPlan", "event", activeEvent.id]
+      : ["mealPlan", groupId, activeEventId],
+    queryFn: isSharedEvent && activeEvent
+      ? () => getMealPlanByEvent(activeEvent.id)
+      : () => getMealPlan(activeGroup.id, activeEvent?.id),
   })
 
-  const invalidatePlan = () => queryClient.invalidateQueries({ queryKey: ["mealPlan", groupId] })
+  const mealPlanQueryKey = isSharedEvent && activeEvent
+    ? ["mealPlan", "event", activeEvent.id]
+    : ["mealPlan", groupId, activeEventId]
+  const invalidatePlan = () => queryClient.invalidateQueries({ queryKey: mealPlanQueryKey })
   const invalidateRecipes = () => queryClient.invalidateQueries({ queryKey: ["recipes"] })
 
   const upsertMutation = useMutation({ mutationFn: upsertDayMeals, onSuccess: invalidatePlan })
@@ -164,8 +172,8 @@ export function MealsSection({ suggestedTags }: { suggestedTags: string[] }) {
       breakfast: existing?.breakfast ?? "",
       lunch: existing?.lunch ?? "",
       dinner: existing?.dinner ?? "",
-      groupId: activeGroup.id,
-      ...(eventId ? { eventId } : {}),
+      groupId: activeEventGroupId,
+      ...(isSharedEvent && activeEvent ? { eventId: activeEvent.id } : eventId ? { eventId } : {}),
       [mealKey]: recipeId,
     }
 
@@ -203,12 +211,16 @@ export function MealsSection({ suggestedTags }: { suggestedTags: string[] }) {
         ))}
       </div>
 
-      {groupEvents.length > 0 && (
-        <EventFilter
-          events={groupEvents}
-          activeEvent={activeEvent}
-          onSelect={(id) => id ? setActiveEvent(id) : clearActiveEvent()}
-        />
+      {isSharedEvent ? (
+        <SharedEventBanner />
+      ) : (
+        groupEvents.length > 0 && (
+          <EventFilter
+            events={groupEvents}
+            activeEvent={activeEvent}
+            onSelect={(id) => id ? setActiveEvent(id) : clearActiveEvent()}
+          />
+        )
       )}
 
       <Card ref={formCardRef} className="border-border/60">
@@ -243,8 +255,9 @@ export function MealsSection({ suggestedTags }: { suggestedTags: string[] }) {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Day</label>
+                    <label htmlFor="meal-day" className="text-xs text-muted-foreground font-medium">Day</label>
                     <select
+                      id="meal-day"
                       value={day}
                       onChange={(e) => setDay(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -253,8 +266,9 @@ export function MealsSection({ suggestedTags }: { suggestedTags: string[] }) {
                     </select>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Meal</label>
+                    <label htmlFor="meal-type" className="text-xs text-muted-foreground font-medium">Meal</label>
                     <select
+                      id="meal-type"
                       value={mealKey}
                       onChange={(e) => setMealKey(e.target.value as MealKey)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -265,8 +279,9 @@ export function MealsSection({ suggestedTags }: { suggestedTags: string[] }) {
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-muted-foreground font-medium">Recipe</label>
+                  <label htmlFor="meal-recipe" className="text-xs text-muted-foreground font-medium">Recipe</label>
                   <select
+                    id="meal-recipe"
                     value={recipeId}
                     onChange={(e) => setRecipeId(e.target.value)}
                     className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -278,10 +293,11 @@ export function MealsSection({ suggestedTags }: { suggestedTags: string[] }) {
                   </select>
                 </div>
 
-                {groupEvents.length > 0 && (
+                {!isSharedEvent && groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
+                    <label htmlFor="meal-event" className="text-xs text-muted-foreground font-medium">Event (optional)</label>
                     <select
+                      id="meal-event"
                       value={eventId}
                       onChange={(e) => setEventId(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"

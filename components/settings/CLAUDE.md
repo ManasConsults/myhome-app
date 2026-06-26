@@ -85,9 +85,69 @@ All data types (`Budget`, `Expense`, `Income`, `Task`, `ShoppingItem`, `Note`, `
 **`GroupSwitcher`** lives in `components/layout/GroupSwitcher.tsx` (may be named `ScopeSwitcher.tsx`). Shows **only groups (households)** — events are never listed here. Shows active group icon + name + location. Click-outside via `useRef` + `document.addEventListener("mousedown", ...)` in `useEffect`.
 
 **Rules:**
-- Every new data item assigned `groupId: activeGroup.id` (always)
+- Every new data item assigned `groupId: activeEventGroupId` (from `useGroup()`) — resolves to shared event's group when a shared event is active
 - Event-scoped items also get `eventId: activeEvent.id`
 - Never hard-code group or event IDs — always read from `useGroup()`
+- When `isSharedEvent`, hide the event selector field in forms (event is implicitly set)
+
+---
+
+## Event Members
+
+Events can be shared with other registered users. The owner adds members by email in Settings > Events.
+
+**`EventMember` type:**
+```ts
+type EventMember = {
+  id: string
+  eventId: string
+  userId: string
+  userName: string
+  userEmail: string
+  createdAt: string
+}
+```
+
+**`SharedEvent` type** (extends `AppEvent`):
+```ts
+type SharedEvent = AppEvent & {
+  sharedByName: string    // owner's name
+  groupName: string
+  groupCurrency: string
+  groupIcon: string
+}
+```
+
+**EventsManager — Members panel:**
+- `expandedMembersId: string | null` state — null = collapsed, set = shows `EventMembersPanel` below that event's card content
+- `EventMembersPanel` (`components/settings/EventMembersPanel.tsx`) renders add-by-email form + member list with remove buttons
+- Members panel only shown to the group owner (add/remove via `addEventMember` / `removeEventMember` server actions)
+
+**EventsManager — "Shared with me" section:**
+- Rendered below owned events when `sharedEvents.length > 0`
+- Each row shows: icon + name + date + group info + sharedByName + "Go to event →" button
+- "Go to event →" calls `setActiveEvent(ev.id)` then `router.push("/finance")`
+- No edit/delete on shared event rows
+
+**Auth rules:**
+- `requireEventMember(eventId)` in `lib/actions/_auth-guard.ts` — allows group owner OR event member; returns `{ session, groupId, isOwner }`
+- Event member can create any data type in a shared event (server derives `groupId` from event)
+- Event member can only delete items they created (`createdBy === session.user.id`); group owner can delete any
+- `createdBy` field (nullable `String?`) added to: Expense, Income, Loan, Task, ShoppingItem, Note, CalendarEvent
+
+**GroupProvider — shared event state:**
+```ts
+sharedEvents: SharedEvent[]     // events this user is a member of (not owner)
+isSharedEvent: boolean          // true when activeEvent is in sharedEvents
+activeEventGroupId: string      // sharedEvent.groupId when isSharedEvent, else activeGroup.id
+```
+- `setActiveEvent(id)` checks owned events first, then shared events; shared events don't change `activeGroup`
+
+**Section component pattern when `isSharedEvent`:**
+- Query uses `getXByEvent(activeEvent.id)` instead of `getX(activeGroup.id, activeEvent?.id)`
+- `SharedEventBanner` (`components/layout/SharedEventBanner.tsx`) replaces `EventFilter`
+- Event selector field hidden in forms
+- Delete buttons hidden client-side when `item.createdBy !== user?.id`
 
 ---
 
