@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
 import { type Expense, type Category } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
+import { useAuth } from "@/components/providers/AuthProvider"
 import { EventFilter } from "@/components/ui/EventFilter"
+import { SharedEventBanner } from "@/components/layout/SharedEventBanner"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getExpenses, createExpense, updateExpense, deleteExpense } from "@/lib/actions/finance"
+import { getExpenses, getExpensesByEvent, createExpense, updateExpense, deleteExpense } from "@/lib/actions/finance"
 
 type Tab = "all" | "recurring" | "one-off"
 type Frequency = "weekly" | "fortnightly" | "monthly" | "yearly"
@@ -80,7 +82,8 @@ const itemVariants = {
 
 export function ExpenseList({ expenseCategories }: { expenseCategories: Category[] }) {
   const iconMap = Object.fromEntries(expenseCategories.map((c) => [c.name, c.icon]))
-  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events, isSharedEvent, activeEventGroupId } = useGroup()
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const currency = activeGroup.currency
   const formCardRef = useRef<HTMLDivElement>(null)
@@ -92,11 +95,18 @@ export function ExpenseList({ expenseCategories }: { expenseCategories: Category
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const { data: expenses = [] } = useQuery({
-    queryKey: ["expenses", activeGroup.id, activeEvent?.id ?? null],
-    queryFn: () => getExpenses(activeGroup.id, activeEvent?.id),
+    queryKey: isSharedEvent && activeEvent
+      ? ["expenses", "event", activeEvent.id]
+      : ["expenses", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: isSharedEvent && activeEvent
+      ? () => getExpensesByEvent(activeEvent.id)
+      : () => getExpenses(activeGroup.id, activeEvent?.id),
   })
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["expenses", activeGroup.id] })
+  const expensesQueryKey = isSharedEvent && activeEvent
+    ? ["expenses", "event", activeEvent.id]
+    : ["expenses", activeGroup.id, activeEvent?.id ?? null]
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: expensesQueryKey })
   const createMutation = useMutation({ mutationFn: createExpense, onSuccess: invalidate })
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Expense, "id" | "createdAt" | "updatedAt">> }) =>
@@ -198,7 +208,8 @@ export function ExpenseList({ expenseCategories }: { expenseCategories: Category
     } else {
       const result = await createMutation.mutateAsync({
         ...shared,
-        groupId: activeGroup.id,
+        groupId: activeEventGroupId,
+        ...(isSharedEvent && activeEvent ? { eventId: activeEvent.id } : {}),
         ...(recurring ? {} : { frequency: undefined, nextDate: undefined }),
       })
       if (result.success) closeForm()
@@ -206,6 +217,10 @@ export function ExpenseList({ expenseCategories }: { expenseCategories: Category
   }
 
   async function handleDelete(id: string) {
+    if (isSharedEvent) {
+      const expense = expenses.find((e) => e.id === id)
+      if (expense?.createdBy !== user?.id) return
+    }
     await deleteMutation.mutateAsync(id)
     setDeleteId(null)
   }
@@ -282,7 +297,9 @@ export function ExpenseList({ expenseCategories }: { expenseCategories: Category
             })}
           </div>
         </div>
-        {groupEvents.length > 0 && (
+        {isSharedEvent ? (
+          <div className="mt-2"><SharedEventBanner /></div>
+        ) : groupEvents.length > 0 && (
           <div className="mt-2">
             <EventFilter
               events={groupEvents}
@@ -311,8 +328,9 @@ export function ExpenseList({ expenseCategories }: { expenseCategories: Category
                 {/* Title + Amount */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Title</label>
+                    <label htmlFor="exp-title" className="text-xs text-muted-foreground font-medium">Title</label>
                     <input
+                      id="exp-title"
                       type="text"
                       placeholder="e.g. Electric bill"
                       value={title}
@@ -322,11 +340,13 @@ export function ExpenseList({ expenseCategories }: { expenseCategories: Category
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Amount</label>
+                    <label htmlFor="exp-amount" className="text-xs text-muted-foreground font-medium">Amount</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">{getCurrencySymbol(currency)}</span>
                       <input
+                        id="exp-amount"
                         type="number"
+                        inputMode="decimal"
                         min="0.01"
                         step="0.01"
                         placeholder="0.00"
@@ -342,8 +362,9 @@ export function ExpenseList({ expenseCategories }: { expenseCategories: Category
                 {/* Category + Date */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Category</label>
+                    <label htmlFor="exp-category" className="text-xs text-muted-foreground font-medium">Category</label>
                     <select
+                      id="exp-category"
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -354,8 +375,9 @@ export function ExpenseList({ expenseCategories }: { expenseCategories: Category
                     </select>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Date</label>
+                    <label htmlFor="exp-date" className="text-xs text-muted-foreground font-medium">Date</label>
                     <input
+                      id="exp-date"
                       type="date"
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
@@ -371,6 +393,7 @@ export function ExpenseList({ expenseCategories }: { expenseCategories: Category
                     type="button"
                     role="switch"
                     aria-checked={recurring}
+                    aria-label="Recurring"
                     onClick={() => setRecurring((v) => !v)}
                     className={cn(
                       "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
@@ -406,10 +429,11 @@ export function ExpenseList({ expenseCategories }: { expenseCategories: Category
                   </AnimatePresence>
                 </div>
 
-                {groupEvents.length > 0 && (
+                {!isSharedEvent && groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
+                    <label htmlFor="exp-event" className="text-xs text-muted-foreground font-medium">Event (optional)</label>
                     <select
+                      id="exp-event"
                       value={eventId}
                       onChange={(e) => setEventId(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -532,6 +556,7 @@ export function ExpenseList({ expenseCategories }: { expenseCategories: Category
                           >
                             <Pencil className="size-3.5" />
                           </button>
+                          {(!isSharedEvent || expense.createdBy === user?.id) && (
                           <button
                             onClick={() => setDeleteId(expense.id)}
                             className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
@@ -539,6 +564,7 @@ export function ExpenseList({ expenseCategories }: { expenseCategories: Category
                           >
                             <Trash2 className="size-3.5" />
                           </button>
+                          )}
                         </div>
                       )}
                     </div>

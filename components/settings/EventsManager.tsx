@@ -1,16 +1,19 @@
 "use client"
 
 import { useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Plus, X, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react"
+import { Plus, X, Pencil, Trash2, ArrowUp, ArrowDown, Users } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { type AppEvent, type Group } from "@/lib/types"
+import { type AppEvent, type Group, type SharedEvent } from "@/lib/types"
 import { useAuth } from "@/components/providers/AuthProvider"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getEventsByUser, createEvent, updateEvent, deleteEvent } from "@/lib/actions/events"
+import { getEventsByUser, createEvent, updateEvent, deleteEvent, getSharedEventsByUser } from "@/lib/actions/events"
 import { getGroups } from "@/lib/actions/groups"
+import { EventMembersPanel } from "./EventMembersPanel"
+import { useGroup } from "@/components/providers/GroupProvider"
 
 const COLOR_MAP = {
   primary:     { bg: "bg-primary/10",     text: "text-primary",     dot: "bg-primary" },
@@ -56,8 +59,10 @@ const EMPTY_FORM: FormState = {
 export function EventsManager() {
   const { user } = useAuth()
   const userId = user?.id ?? ""
+  const router = useRouter()
   const queryClient = useQueryClient()
   const formRef = useRef<HTMLDivElement>(null)
+  const { setActiveEvent } = useGroup()
 
   const { data: groups = [] } = useQuery<Group[]>({
     queryKey: ["groups", userId],
@@ -68,6 +73,12 @@ export function EventsManager() {
   const { data: events = [] } = useQuery<AppEvent[]>({
     queryKey: ["events", userId],
     queryFn: () => getEventsByUser(),
+    enabled: !!userId,
+  })
+
+  const { data: sharedEvents = [] } = useQuery<SharedEvent[]>({
+    queryKey: ["shared-events", userId],
+    queryFn: () => getSharedEventsByUser(),
     enabled: !!userId,
   })
 
@@ -84,6 +95,7 @@ export function EventsManager() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [expandedMembersId, setExpandedMembersId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
 
   function openCreate() {
@@ -148,11 +160,18 @@ export function EventsManager() {
     })
   }
 
+  function handleGoToEvent(ev: SharedEvent) {
+    setActiveEvent(ev.id)
+    router.push("/finance")
+  }
+
   const groupedEvents = groups.reduce<Record<string, AppEvent[]>>((acc, g) => {
     const grouped = events.filter((ev) => ev.groupId === g.id)
     if (grouped.length > 0) acc[g.id] = grouped
     return acc
   }, {})
+
+  const hasAnyOwned = events.length > 0
 
   return (
     <div className="flex flex-col gap-4">
@@ -186,8 +205,9 @@ export function EventsManager() {
 
                     <div className="grid grid-cols-2 gap-2">
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs text-muted-foreground font-medium">Name *</label>
+                        <label htmlFor="event-name" className="text-xs text-muted-foreground font-medium">Name *</label>
                         <input
+                          id="event-name"
                           type="text"
                           placeholder="e.g. Wedding 2026"
                           value={form.name}
@@ -197,8 +217,9 @@ export function EventsManager() {
                         />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs text-muted-foreground font-medium">Household *</label>
+                        <label htmlFor="event-household" className="text-xs text-muted-foreground font-medium">Household *</label>
                         <select
+                          id="event-household"
                           value={form.groupId}
                           onChange={(e) => setForm((f) => ({ ...f, groupId: e.target.value }))}
                           className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -212,8 +233,9 @@ export function EventsManager() {
 
                     <div className="grid grid-cols-2 gap-2">
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs text-muted-foreground font-medium">Start date *</label>
+                        <label htmlFor="event-start" className="text-xs text-muted-foreground font-medium">Start date *</label>
                         <input
+                          id="event-start"
                           type="date"
                           value={form.startDate}
                           onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
@@ -222,8 +244,9 @@ export function EventsManager() {
                         />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs text-muted-foreground font-medium">End date</label>
+                        <label htmlFor="event-end" className="text-xs text-muted-foreground font-medium">End date</label>
                         <input
+                          id="event-end"
                           type="date"
                           value={form.endDate}
                           onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
@@ -234,8 +257,9 @@ export function EventsManager() {
 
                     <div className="grid grid-cols-2 gap-2">
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs text-muted-foreground font-medium">Icon</label>
+                        <label htmlFor="event-icon" className="text-xs text-muted-foreground font-medium">Icon</label>
                         <input
+                          id="event-icon"
                           type="text"
                           placeholder="🎉"
                           value={form.icon}
@@ -244,8 +268,9 @@ export function EventsManager() {
                         />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs text-muted-foreground font-medium">Color</label>
+                        <label htmlFor="event-color" className="text-xs text-muted-foreground font-medium">Color</label>
                         <select
+                          id="event-color"
                           value={form.color}
                           onChange={(e) => setForm((f) => ({ ...f, color: e.target.value as ColorKey }))}
                           className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -275,115 +300,181 @@ export function EventsManager() {
         </AnimatePresence>
       </div>
 
-      {events.length === 0 ? (
+      {!hasAnyOwned && sharedEvents.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">No events yet.</p>
       ) : (
         <>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Sort:</span>
-            {SORT_OPTIONS.map((s) => {
-              const active = sortBy === s.key
-              return (
-                <button
-                  key={s.key}
-                  onClick={() => {
-                    if (active) {
-                      setSortDir((d) => d === "asc" ? "desc" : "asc")
-                    } else {
-                      setSortBy(s.key)
-                      setSortDir("asc")
-                    }
-                  }}
-                  className={cn(
-                    "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                    active
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                  )}
-                >
-                  {s.label}
-                  {active && (sortDir === "asc"
-                    ? <ArrowUp className="size-3" />
-                    : <ArrowDown className="size-3" />
-                  )}
-                </button>
-              )
-            })}
-          </div>
-          <div className="flex flex-col gap-5">
-            {groups.map((g) => {
-              const groupEvents = groupedEvents[g.id]
-              if (!groupEvents) return null
-              return (
-                <div key={g.id} className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">{g.icon}</span>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{g.name}</p>
-                  </div>
-                  {sortEvents(groupEvents).map((ev) => {
-                    const c = COLOR_MAP[ev.color]
-                    const dateLabel = ev.endDate
-                      ? `${fmtDate(ev.startDate)} → ${fmtDate(ev.endDate)}`
-                      : `From ${fmtDate(ev.startDate)}`
-                    const isDeleting = deleteId === ev.id
-                    return (
-                      <Card key={ev.id}>
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-3">
-                            <div className={cn("size-10 rounded-xl flex items-center justify-center text-lg shrink-0", c.bg)}>
-                              {ev.icon}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold truncate">{ev.name}</p>
-                              <p className="text-xs text-muted-foreground">{dateLabel}</p>
-                              {ev.description && (
-                                <p className="text-xs text-muted-foreground truncate mt-0.5">{ev.description}</p>
-                              )}
-                            </div>
-                            <div className={cn("size-2.5 rounded-full shrink-0", c.dot)} />
-                            {isDeleting ? (
-                              <div className="flex items-center gap-1 shrink-0">
-                                <span className="text-xs text-muted-foreground">Delete?</span>
-                                <button
-                                  onClick={() => handleDelete(ev.id)}
-                                  className="px-2 py-0.5 rounded text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
-                                >
-                                  Yes
-                                </button>
-                                <button
-                                  onClick={() => setDeleteId(null)}
-                                  className="px-2 py-0.5 rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                                >
-                                  No
-                                </button>
+          {hasAnyOwned && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Sort:</span>
+                {SORT_OPTIONS.map((s) => {
+                  const active = sortBy === s.key
+                  return (
+                    <button
+                      key={s.key}
+                      onClick={() => {
+                        if (active) {
+                          setSortDir((d) => d === "asc" ? "desc" : "asc")
+                        } else {
+                          setSortBy(s.key)
+                          setSortDir("asc")
+                        }
+                      }}
+                      className={cn(
+                        "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                        active
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                      )}
+                    >
+                      {s.label}
+                      {active && (sortDir === "asc"
+                        ? <ArrowUp className="size-3" />
+                        : <ArrowDown className="size-3" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="flex flex-col gap-5">
+                {groups.map((g) => {
+                  const groupEvents = groupedEvents[g.id]
+                  if (!groupEvents) return null
+                  return (
+                    <div key={g.id} className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">{g.icon}</span>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{g.name}</p>
+                      </div>
+                      {sortEvents(groupEvents).map((ev) => {
+                        const c = COLOR_MAP[ev.color]
+                        const dateLabel = ev.endDate
+                          ? `${fmtDate(ev.startDate)} → ${fmtDate(ev.endDate)}`
+                          : `From ${fmtDate(ev.startDate)}`
+                        const isDeleting = deleteId === ev.id
+                        const membersExpanded = expandedMembersId === ev.id
+                        return (
+                          <Card key={ev.id}>
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-3">
+                                <div className={cn("size-10 rounded-xl flex items-center justify-center text-lg shrink-0", c.bg)}>
+                                  {ev.icon}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold truncate">{ev.name}</p>
+                                  <p className="text-xs text-muted-foreground">{dateLabel}</p>
+                                  {ev.description && (
+                                    <p className="text-xs text-muted-foreground truncate mt-0.5">{ev.description}</p>
+                                  )}
+                                </div>
+                                <div className={cn("size-2.5 rounded-full shrink-0", c.dot)} />
+                                {isDeleting ? (
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <span className="text-xs text-muted-foreground">Delete?</span>
+                                    <button
+                                      onClick={() => handleDelete(ev.id)}
+                                      className="px-2 py-0.5 rounded text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                                    >
+                                      Yes
+                                    </button>
+                                    <button
+                                      onClick={() => setDeleteId(null)}
+                                      className="px-2 py-0.5 rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                    >
+                                      No
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-0.5 shrink-0">
+                                    <button
+                                      onClick={() => setExpandedMembersId(membersExpanded ? null : ev.id)}
+                                      className={cn(
+                                        "size-8 flex items-center justify-center rounded-lg transition-colors",
+                                        membersExpanded
+                                          ? "bg-primary/10 text-primary"
+                                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                      )}
+                                      aria-label={`${membersExpanded ? "Hide" : "Show"} members for ${ev.name}`}
+                                    >
+                                      <Users className="size-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => openEdit(ev)}
+                                      className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                      aria-label={`Edit ${ev.name}`}
+                                    >
+                                      <Pencil className="size-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => setDeleteId(ev.id)}
+                                      className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                      aria-label={`Delete ${ev.name}`}
+                                    >
+                                      <Trash2 className="size-3.5" />
+                                    </button>
+                                  </div>
+                                )}
                               </div>
-                            ) : (
-                              <div className="flex items-center gap-0.5 shrink-0">
-                                <button
-                                  onClick={() => openEdit(ev)}
-                                  className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                                  aria-label={`Edit ${ev.name}`}
-                                >
-                                  <Pencil className="size-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => setDeleteId(ev.id)}
-                                  className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                                  aria-label={`Delete ${ev.name}`}
-                                >
-                                  <Trash2 className="size-3.5" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )
-                  })}
-                </div>
-              )
-            })}
-          </div>
+
+                              <AnimatePresence>
+                                {membersExpanded && (
+                                  <EventMembersPanel eventId={ev.id} eventName={ev.name} />
+                                )}
+                              </AnimatePresence>
+                            </CardContent>
+                          </Card>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Shared with me */}
+          {sharedEvents.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 mt-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Shared with me</p>
+              </div>
+              {sharedEvents.map((ev) => {
+                const c = COLOR_MAP[ev.color]
+                const dateLabel = ev.endDate
+                  ? `${fmtDate(ev.startDate)} → ${fmtDate(ev.endDate)}`
+                  : `From ${fmtDate(ev.startDate)}`
+                return (
+                  <Card key={ev.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className={cn("size-10 rounded-xl flex items-center justify-center text-lg shrink-0", c.bg)}>
+                          {ev.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate">{ev.name}</p>
+                          <p className="text-xs text-muted-foreground">{dateLabel}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {ev.groupIcon} {ev.groupName} · Shared by {ev.sharedByName}
+                          </p>
+                        </div>
+                        <div className={cn("size-2.5 rounded-full shrink-0", c.dot)} />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs shrink-0"
+                          onClick={() => handleGoToEvent(ev)}
+                        >
+                          Go to event →
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
         </>
       )}
     </div>

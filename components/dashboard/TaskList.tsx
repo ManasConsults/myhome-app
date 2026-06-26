@@ -40,9 +40,10 @@ interface TaskListProps {
   data?: Task[]
   onEdit?: (task: Task) => void
   onDelete?: (id: string) => void
+  canDelete?: (task: Task) => boolean
 }
 
-export function TaskList({ data, onEdit, onDelete }: TaskListProps) {
+export function TaskList({ data, onEdit, onDelete, canDelete }: TaskListProps) {
   const { activeGroup } = useGroup()
   const { data: fetchedTasks = [] } = useQuery<Task[]>({
     queryKey: ["tasks", activeGroup.id, null],
@@ -148,8 +149,14 @@ export function TaskList({ data, onEdit, onDelete }: TaskListProps) {
             transition={{ duration: 0.2 }}
           >
             {filtered.length === 0 ? (
-              <li className="py-8 text-center text-sm text-muted-foreground">
-                {filter === "pending" ? "All tasks complete!" : "No tasks yet"}
+              <li className="py-8 flex flex-col items-center gap-2">
+                {filter === "pending"
+                  ? <CheckCircle2 className="size-7 text-muted-foreground/30" />
+                  : <Circle className="size-7 text-muted-foreground/30" />
+                }
+                <span className="text-sm text-muted-foreground">
+                  {filter === "pending" ? "All tasks complete!" : "No tasks yet"}
+                </span>
               </li>
             ) : (
               filtered.map((task, i) => {
@@ -233,7 +240,7 @@ export function TaskList({ data, onEdit, onDelete }: TaskListProps) {
                               <Pencil className="size-3.5" />
                             </button>
                           )}
-                          {onDelete && (
+                          {onDelete && (!canDelete || canDelete(task)) && (
                             <button
                               onClick={() => setDeleteId(task.id)}
                               className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"

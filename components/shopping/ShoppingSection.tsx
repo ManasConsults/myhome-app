@@ -2,92 +2,88 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Plus, X, ShoppingCart, PackageCheck, DollarSign, Store } from "lucide-react"
+import { Plus, X, ShoppingCart, PackageCheck, DollarSign, List } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
-import { type ShoppingItem, type Category } from "@/lib/types"
+import { cn, formatCurrency } from "@/lib/utils"
+import { type ShoppingList, type Category } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
-import { ShoppingList } from "@/components/dashboard/ShoppingList"
 import { EventFilter } from "@/components/ui/EventFilter"
+import { SharedEventBanner } from "@/components/layout/SharedEventBanner"
+import { ShoppingListCard } from "@/components/shopping/ShoppingListCard"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getShoppingItems, createShoppingItem, updateShoppingItem, deleteShoppingItem } from "@/lib/actions/shopping"
+import {
+  getShoppingLists,
+  createShoppingList,
+  updateShoppingList,
+  deleteShoppingList,
+} from "@/lib/actions/shopping-lists"
 
 export function ShoppingSection({ categories }: { categories: Category[] }) {
-  const iconMap = Object.fromEntries(categories.map((c) => [c.name, c.icon]))
-  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events, isSharedEvent, activeEventGroupId } = useGroup()
   const queryClient = useQueryClient()
   const currency = activeGroup.currency
-
   const formCardRef = useRef<HTMLDivElement>(null)
+
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [listName, setListName] = useState("")
+  const [listEventId, setListEventId] = useState("")
 
-  const [name, setName] = useState("")
-  const [category, setCategory] = useState(() => categories[0]?.name ?? "")
-  const [quantity, setQuantity] = useState("1")
-  const [unit, setUnit] = useState("pcs")
-  const [price, setPrice] = useState("")
-  const [store, setStore] = useState("")
-  const [eventId, setEventId] = useState("")
+  useEffect(() => { setListEventId(activeEvent?.id ?? "") }, [activeEvent?.id])
 
-  useEffect(() => { setEventId(activeEvent?.id ?? "") }, [activeEvent?.id])
+  const queryKey = isSharedEvent && activeEvent
+    ? ["shopping-lists", "event", activeEvent.id]
+    : ["shopping-lists", activeGroup.id, activeEvent?.id ?? null]
 
-  const { data: itemList = [] } = useQuery({
-    queryKey: ["shopping", activeGroup.id, activeEvent?.id ?? null],
-    queryFn: () => getShoppingItems(activeGroup.id, activeEvent?.id),
+  const { data: lists = [] } = useQuery({
+    queryKey,
+    queryFn: isSharedEvent && activeEvent
+      ? () => getShoppingLists("", activeEvent.id)
+      : () => getShoppingLists(activeGroup.id, activeEvent?.id),
   })
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["shopping", activeGroup.id] })
+  const invalidate = () => queryClient.invalidateQueries({ queryKey })
 
-  const createMutation = useMutation({ mutationFn: createShoppingItem, onSuccess: invalidate })
+  const createMutation = useMutation({ mutationFn: createShoppingList, onSuccess: invalidate })
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Omit<ShoppingItem, "id" | "createdAt" | "updatedAt">> }) =>
-      updateShoppingItem(id, data),
+    mutationFn: ({ id, data }: { id: string; data: { name?: string; eventId?: string | null } }) =>
+      updateShoppingList(id, data),
     onSuccess: invalidate,
   })
-  const deleteMutation = useMutation({ mutationFn: deleteShoppingItem, onSuccess: invalidate })
+  const deleteMutation = useMutation({ mutationFn: deleteShoppingList, onSuccess: invalidate })
 
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 
-  const total = itemList.length
-  const collectedCount = itemList.filter((i) => i.checked).length
-  const totalCost = itemList.reduce((sum, i) => sum + i.estimatedPrice, 0)
-  const storeCount = new Set(itemList.map((i) => i.store)).size
+  const totalItems = lists.reduce((s, l) => s + l.itemCount, 0)
+  const collectedCount = lists.reduce((s, l) => s + l.checkedCount, 0)
+  const totalCost = lists.reduce((s, l) => s + l.estimatedTotal, 0)
 
   const statsData = [
-    { label: "Total Items", value: total, icon: ShoppingCart, color: "text-primary", bg: "bg-primary/10" },
+    { label: "Total Items", value: totalItems, icon: ShoppingCart, color: "text-primary", bg: "bg-primary/10" },
     { label: "Collected", value: collectedCount, icon: PackageCheck, color: "text-success", bg: "bg-success/10" },
     { label: "Est. Total", value: formatCurrency(totalCost, currency, 0), icon: DollarSign, color: "text-warning", bg: "bg-warning/10" },
-    { label: "Stores", value: storeCount, icon: Store, color: "text-destructive", bg: "bg-destructive/10" },
+    { label: "Lists", value: lists.length, icon: List, color: "text-destructive", bg: "bg-destructive/10" },
   ]
 
   function resetForm() {
-    setName("")
-    setCategory(categories[0]?.name ?? "")
-    setQuantity("1")
-    setUnit("pcs")
-    setPrice("")
-    setStore("")
-    setEventId(activeEvent?.id ?? "")
+    setListName("")
+    setListEventId(activeEvent?.id ?? "")
   }
 
   function openCreate() {
     setEditingId(null)
     resetForm()
     setShowForm(true)
+    setTimeout(() => {
+      formCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, 50)
   }
 
-  function openEdit(item: ShoppingItem) {
-    setEditingId(item.id)
-    setName(item.name)
-    setCategory(item.category)
-    setQuantity(String(item.quantity))
-    setUnit(item.unit)
-    setPrice(item.estimatedPrice > 0 ? String(item.estimatedPrice) : "")
-    setStore(item.store)
-    setEventId(item.eventId ?? "")
+  function openEdit(list: ShoppingList) {
+    setEditingId(list.id)
+    setListName(list.name)
+    setListEventId(list.eventId ?? "")
     setShowForm(true)
     setTimeout(() => {
       formCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -100,37 +96,28 @@ export function ShoppingSection({ categories }: { categories: Category[] }) {
     resetForm()
   }
 
-  async function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (!name.trim() || !store.trim()) return
+    if (!listName.trim()) return
 
     if (editingId) {
       const result = await updateMutation.mutateAsync({
         id: editingId,
         data: {
-          name: name.trim(),
-          category,
-          quantity: parseFloat(quantity) || 1,
-          unit: unit.trim() || "pcs",
-          estimatedPrice: parseFloat(price) || 0,
-          store: store.trim(),
-          icon: iconMap[category] ?? "🛍️",
-          ...(eventId ? { eventId } : { eventId: undefined }),
+          name: listName.trim(),
+          eventId: listEventId || null,
         },
       })
       if (result.success) closeForm()
     } else {
       const result = await createMutation.mutateAsync({
-        name: name.trim(),
-        category,
-        quantity: parseFloat(quantity) || 1,
-        unit: unit.trim() || "pcs",
-        estimatedPrice: parseFloat(price) || 0,
-        checked: false,
-        store: store.trim(),
-        icon: iconMap[category] ?? "🛍️",
-        groupId: activeGroup.id,
-        ...(eventId ? { eventId } : {}),
+        name: listName.trim(),
+        groupId: activeEventGroupId,
+        ...(isSharedEvent && activeEvent
+          ? { eventId: activeEvent.id }
+          : listEventId
+          ? { eventId: listEventId }
+          : {}),
       })
       if (result.success) closeForm()
     }
@@ -142,6 +129,7 @@ export function ShoppingSection({ categories }: { categories: Category[] }) {
 
   return (
     <>
+      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {statsData.map((s) => (
           <Card key={s.label} className="border-border/60">
@@ -158,18 +146,24 @@ export function ShoppingSection({ categories }: { categories: Category[] }) {
         ))}
       </div>
 
-      {groupEvents.length > 0 && (
-        <EventFilter
-          events={groupEvents}
-          activeEvent={activeEvent}
-          onSelect={(id) => id ? setActiveEvent(id) : clearActiveEvent()}
-        />
+      {/* Event filter */}
+      {isSharedEvent ? (
+        <SharedEventBanner />
+      ) : (
+        groupEvents.length > 0 && (
+          <EventFilter
+            events={groupEvents}
+            activeEvent={activeEvent}
+            onSelect={(id) => id ? setActiveEvent(id) : clearActiveEvent()}
+          />
+        )
       )}
 
+      {/* Create / edit list form */}
       <Card ref={formCardRef} className="border-border/60">
         <CardHeader className="border-b border-border/60 pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle>Shopping List</CardTitle>
+            <CardTitle>Shopping Lists</CardTitle>
             <Button
               size="sm"
               variant="ghost"
@@ -177,7 +171,7 @@ export function ShoppingSection({ categories }: { categories: Category[] }) {
               onClick={() => (showForm ? closeForm() : openCreate())}
             >
               {showForm ? <X className="size-3.5" /> : <Plus className="size-3.5" />}
-              {showForm ? "Cancel" : "Add item"}
+              {showForm ? "Cancel" : "New list"}
             </Button>
           </div>
         </CardHeader>
@@ -185,7 +179,7 @@ export function ShoppingSection({ categories }: { categories: Category[] }) {
         <AnimatePresence>
           {showForm && (
             <motion.form
-              key="shopping-form"
+              key="list-form"
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
@@ -194,90 +188,32 @@ export function ShoppingSection({ categories }: { categories: Category[] }) {
               className="overflow-hidden"
             >
               <div className="p-4 flex flex-col gap-3 border-b border-border/60">
-                <p className="text-sm font-medium">{editingId ? "Edit item" : "New item"}</p>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Item name</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Milk"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                      className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Store</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Woolworths"
-                      value={store}
-                      onChange={(e) => setStore(e.target.value)}
-                      required
-                      className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                  </div>
-                </div>
+                <p className="text-sm font-medium">{editingId ? "Edit list" : "New list"}</p>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-muted-foreground font-medium">Category</label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
+                  <label htmlFor="list-name" className="text-xs text-muted-foreground font-medium">
+                    List name
+                  </label>
+                  <input
+                    id="list-name"
+                    type="text"
+                    placeholder="e.g. Weekly Groceries"
+                    value={listName}
+                    onChange={(e) => setListName(e.target.value)}
+                    required
                     className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  >
-                    {categories.map((c) => <option key={c.id} value={c.name}>{c.icon ? `${c.icon} ` : ""}{c.name}</option>)}
-                  </select>
+                  />
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
+                {!isSharedEvent && groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Qty</label>
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      placeholder="1"
-                      value={quantity}
-                      onChange={(e) => setQuantity(e.target.value)}
-                      className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Unit</label>
-                    <input
-                      type="text"
-                      placeholder="pcs"
-                      value={unit}
-                      onChange={(e) => setUnit(e.target.value)}
-                      className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Est. price</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">{getCurrencySymbol(currency)}</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                        className="h-9 pl-7 pr-3 w-full rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {groupEvents.length > 0 && (
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
+                    <label htmlFor="list-event" className="text-xs text-muted-foreground font-medium">
+                      Event (optional)
+                    </label>
                     <select
-                      value={eventId}
-                      onChange={(e) => setEventId(e.target.value)}
+                      id="list-event"
+                      value={listEventId}
+                      onChange={(e) => setListEventId(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                     >
                       <option value="">No event</option>
@@ -289,13 +225,15 @@ export function ShoppingSection({ categories }: { categories: Category[] }) {
                 )}
 
                 <div className="flex items-center gap-2 justify-end">
-                  <Button type="button" variant="ghost" size="sm" onClick={closeForm}>Cancel</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={closeForm}>
+                    Cancel
+                  </Button>
                   <Button
                     type="submit"
                     size="sm"
                     disabled={createMutation.isPending || updateMutation.isPending}
                   >
-                    {editingId ? "Save changes" : "Add item"}
+                    {editingId ? "Save changes" : "Create list"}
                   </Button>
                 </div>
               </div>
@@ -304,7 +242,48 @@ export function ShoppingSection({ categories }: { categories: Category[] }) {
         </AnimatePresence>
       </Card>
 
-      <ShoppingList data={itemList} onEdit={openEdit} onDelete={handleDelete} />
+      {/* List cards */}
+      <AnimatePresence>
+        {lists.map((list, i) => (
+          <motion.div
+            key={list.id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, delay: i * 0.04 }}
+          >
+            <ShoppingListCard
+              list={list}
+              categories={categories}
+              currency={currency}
+              isSharedEvent={isSharedEvent}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+            />
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
+      {/* Empty state */}
+      {lists.length === 0 && !showForm && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center gap-3 py-12 text-center"
+        >
+          <div className="size-14 rounded-2xl bg-muted flex items-center justify-center">
+            <ShoppingCart className="size-7 text-muted-foreground/50" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium">No shopping lists yet</p>
+            <p className="text-xs text-muted-foreground">Create a list to start adding items</p>
+          </div>
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="size-3.5" />
+            Create your first list
+          </Button>
+        </motion.div>
+      )}
     </>
   )
 }

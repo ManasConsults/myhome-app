@@ -11,12 +11,13 @@ import { useGroup } from "@/components/providers/GroupProvider"
 import { CalendarGrid } from "@/components/calendar/CalendarGrid"
 import { UpcomingEvents } from "@/components/calendar/UpcomingEvents"
 import { EventFilter } from "@/components/ui/EventFilter"
+import { SharedEventBanner } from "@/components/layout/SharedEventBanner"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getCalendarEvents, createCalendarEvent } from "@/lib/actions/calendar"
+import { getCalendarEvents, getCalendarEventsByEvent, createCalendarEvent } from "@/lib/actions/calendar"
 
 export function CalendarSection({ categories }: { categories: Category[] }) {
   const iconMap = Object.fromEntries(categories.map((c) => [c.name, c.icon]))
-  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events, isSharedEvent, activeEventGroupId } = useGroup()
   const queryClient = useQueryClient()
 
   const [showForm, setShowForm] = useState(false)
@@ -31,12 +32,18 @@ export function CalendarSection({ categories }: { categories: Category[] }) {
   useEffect(() => { setEventId(activeEvent?.id ?? "") }, [activeEvent?.id])
 
   const { data: eventList = [] } = useQuery({
-    queryKey: ["calendar", activeGroup.id, activeEvent?.id ?? null],
-    queryFn: () => getCalendarEvents(activeGroup.id, activeEvent?.id),
+    queryKey: isSharedEvent && activeEvent
+      ? ["calendar", "event", activeEvent.id]
+      : ["calendar", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: isSharedEvent && activeEvent
+      ? () => getCalendarEventsByEvent(activeEvent.id)
+      : () => getCalendarEvents(activeGroup.id, activeEvent?.id),
   })
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["calendar", activeGroup.id] })
+  const queryKey = isSharedEvent && activeEvent
+    ? ["calendar", "event", activeEvent.id]
+    : ["calendar", activeGroup.id, activeEvent?.id ?? null]
+  const invalidate = () => queryClient.invalidateQueries({ queryKey })
 
   const createMutation = useMutation({ mutationFn: createCalendarEvent, onSuccess: invalidate })
 
@@ -67,8 +74,8 @@ export function CalendarSection({ categories }: { categories: Category[] }) {
       category,
       allDay,
       icon: iconMap[category] ?? "📅",
-      groupId: activeGroup.id,
-      ...(eventId ? { eventId } : {}),
+      groupId: activeEventGroupId,
+      ...(isSharedEvent && activeEvent ? { eventId: activeEvent.id } : eventId ? { eventId } : {}),
     })
 
     if (result.success) {
@@ -100,12 +107,16 @@ export function CalendarSection({ categories }: { categories: Category[] }) {
         ))}
       </div>
 
-      {groupEvents.length > 0 && (
-        <EventFilter
-          events={groupEvents}
-          activeEvent={activeEvent}
-          onSelect={(id) => id ? setActiveEvent(id) : clearActiveEvent()}
-        />
+      {isSharedEvent ? (
+        <SharedEventBanner />
+      ) : (
+        groupEvents.length > 0 && (
+          <EventFilter
+            events={groupEvents}
+            activeEvent={activeEvent}
+            onSelect={(id) => id ? setActiveEvent(id) : clearActiveEvent()}
+          />
+        )
       )}
 
       <Card className="border-border/60">
@@ -138,8 +149,9 @@ export function CalendarSection({ categories }: { categories: Category[] }) {
               <div className="p-4 flex flex-col gap-3 border-b border-border/60">
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-muted-foreground font-medium">Title</label>
+                  <label htmlFor="cal-title" className="text-xs text-muted-foreground font-medium">Title</label>
                   <input
+                    id="cal-title"
                     type="text"
                     placeholder="e.g. Doctor appointment"
                     value={title}
@@ -151,8 +163,9 @@ export function CalendarSection({ categories }: { categories: Category[] }) {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Date</label>
+                    <label htmlFor="cal-date" className="text-xs text-muted-foreground font-medium">Date</label>
                     <input
+                      id="cal-date"
                       type="date"
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
@@ -161,8 +174,9 @@ export function CalendarSection({ categories }: { categories: Category[] }) {
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Category</label>
+                    <label htmlFor="cal-category" className="text-xs text-muted-foreground font-medium">Category</label>
                     <select
+                      id="cal-category"
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -179,6 +193,7 @@ export function CalendarSection({ categories }: { categories: Category[] }) {
                     type="button"
                     role="switch"
                     aria-checked={allDay}
+                    aria-label="All day"
                     onClick={() => setAllDay((v) => !v)}
                     className={cn(
                       "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
@@ -202,9 +217,11 @@ export function CalendarSection({ categories }: { categories: Category[] }) {
                         className="ml-auto"
                       >
                         <input
+                          id="cal-time"
                           type="time"
                           value={time}
                           onChange={(e) => setTime(e.target.value)}
+                          aria-label="Event time"
                           className="h-8 px-2 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
                       </motion.div>
@@ -212,10 +229,11 @@ export function CalendarSection({ categories }: { categories: Category[] }) {
                   </AnimatePresence>
                 </div>
 
-                {groupEvents.length > 0 && (
+                {!isSharedEvent && groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
+                    <label htmlFor="cal-event" className="text-xs text-muted-foreground font-medium">Event (optional)</label>
                     <select
+                      id="cal-event"
                       value={eventId}
                       onChange={(e) => setEventId(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"

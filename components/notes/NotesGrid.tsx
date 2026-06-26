@@ -55,9 +55,10 @@ interface NotesGridProps {
   data: Note[]
   onEdit?: (note: Note) => void
   onDelete?: (id: string) => void
+  canDelete?: (note: Note) => boolean
 }
 
-export function NotesGrid({ data, onEdit, onDelete }: NotesGridProps) {
+export function NotesGrid({ data, onEdit, onDelete, canDelete }: NotesGridProps) {
   const source = data
   const [sortBy, setSortBy] = useState<SortKey>("updatedAt")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
@@ -174,7 +175,7 @@ export function NotesGrid({ data, onEdit, onDelete }: NotesGridProps) {
                     <Pencil className="size-3" />
                   </button>
                 )}
-                {onDelete && (
+                {onDelete && (!canDelete || canDelete(note)) && (
                   <button
                     onClick={() => setDeleteId(note.id)}
                     className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"

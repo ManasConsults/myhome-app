@@ -3,7 +3,8 @@
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
 import type { Budget, Expense, Income, Loan, LoanAdvance, LoanRepayment } from "@/lib/types"
-import { requireGroupOwner } from "./_auth-guard"
+import { unstable_rethrow } from "next/navigation"
+import { requireGroupOwner, requireEventMember } from "./_auth-guard"
 
 // ─── Budget ─────────────────────────────────────────────────────────────────
 
@@ -29,8 +30,21 @@ function serializeBudget(b: Awaited<ReturnType<typeof prisma.budget.findFirst>>)
 
 export async function getBudgets(groupId: string, eventId?: string): Promise<Budget[]> {
   await requireGroupOwner(groupId)
+  if (eventId) {
+    const event = await prisma.appEvent.findFirst({ where: { id: eventId, groupId }, select: { id: true } })
+    if (!event) throw new Error("Forbidden")
+  }
   const items = await prisma.budget.findMany({
     where: eventId ? { eventId } : { groupId },
+    orderBy: { updatedAt: "desc" },
+  })
+  return items.map(serializeBudget)
+}
+
+export async function getBudgetsByEvent(eventId: string): Promise<Budget[]> {
+  await requireEventMember(eventId)
+  const items = await prisma.budget.findMany({
+    where: { eventId },
     orderBy: { updatedAt: "desc" },
   })
   return items.map(serializeBudget)
@@ -58,6 +72,7 @@ export async function createBudget(
     })
     return { success: true, data: serializeBudget(b) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }
@@ -81,6 +96,7 @@ export async function updateBudget(
     })
     return { success: true, data: serializeBudget(b) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }
@@ -94,6 +110,7 @@ export async function deleteBudget(id: string): Promise<{ success: boolean }> {
     await prisma.budget.delete({ where: { id } })
     return { success: true }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false }
   }
@@ -116,6 +133,7 @@ function serializeExpense(e: Awaited<ReturnType<typeof prisma.expense.findFirst>
     budgetId: e.budgetId ?? undefined,
     groupId: e.groupId,
     eventId: e.eventId ?? undefined,
+    createdBy: e.createdBy ?? undefined,
     createdAt: toDateStr(e.createdAt),
     updatedAt: toDateStr(e.updatedAt),
   }
@@ -123,8 +141,21 @@ function serializeExpense(e: Awaited<ReturnType<typeof prisma.expense.findFirst>
 
 export async function getExpenses(groupId: string, eventId?: string): Promise<Expense[]> {
   await requireGroupOwner(groupId)
+  if (eventId) {
+    const event = await prisma.appEvent.findFirst({ where: { id: eventId, groupId }, select: { id: true } })
+    if (!event) throw new Error("Forbidden")
+  }
   const items = await prisma.expense.findMany({
     where: eventId ? { eventId } : { groupId },
+    orderBy: { date: "desc" },
+  })
+  return items.map(serializeExpense)
+}
+
+export async function getExpensesByEvent(eventId: string): Promise<Expense[]> {
+  await requireEventMember(eventId)
+  const items = await prisma.expense.findMany({
+    where: { eventId },
     orderBy: { date: "desc" },
   })
   return items.map(serializeExpense)
@@ -134,7 +165,17 @@ export async function createExpense(
   data: Omit<Expense, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: Expense } | { success: false; error: string }> {
   try {
-    await requireGroupOwner(data.groupId)
+    let resolvedGroupId = data.groupId
+    let createdBy: string | null = null
+
+    if (data.eventId) {
+      const { session, groupId } = await requireEventMember(data.eventId)
+      resolvedGroupId = groupId
+      createdBy = session.user.id
+    } else {
+      await requireGroupOwner(data.groupId)
+    }
+
     const e = await prisma.expense.create({
       data: {
         title: data.title,
@@ -146,12 +187,14 @@ export async function createExpense(
         frequency: data.frequency ?? null,
         nextDate: data.nextDate ? new Date(data.nextDate) : null,
         budgetId: data.budgetId ?? null,
-        groupId: data.groupId,
+        groupId: resolvedGroupId,
         eventId: data.eventId ?? null,
+        createdBy,
       },
     })
     return { success: true, data: serializeExpense(e) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }
@@ -178,6 +221,7 @@ export async function updateExpense(
     })
     return { success: true, data: serializeExpense(e) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }
@@ -185,12 +229,23 @@ export async function updateExpense(
 
 export async function deleteExpense(id: string): Promise<{ success: boolean }> {
   try {
-    const existing = await prisma.expense.findUnique({ where: { id }, select: { groupId: true } })
+    const existing = await prisma.expense.findUnique({
+      where: { id },
+      select: { groupId: true, eventId: true, createdBy: true },
+    })
     if (!existing) return { success: false }
-    await requireGroupOwner(existing.groupId)
+
+    if (existing.eventId) {
+      const { session, isOwner } = await requireEventMember(existing.eventId)
+      if (!isOwner && existing.createdBy !== session.user.id) throw new Error("Forbidden")
+    } else {
+      await requireGroupOwner(existing.groupId)
+    }
+
     await prisma.expense.delete({ where: { id } })
     return { success: true }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false }
   }
@@ -212,6 +267,7 @@ function serializeIncome(i: Awaited<ReturnType<typeof prisma.income.findFirst>>)
     nextDate: i.nextDate ? toDateStr(i.nextDate) : undefined,
     groupId: i.groupId,
     eventId: i.eventId ?? undefined,
+    createdBy: i.createdBy ?? undefined,
     createdAt: toDateStr(i.createdAt),
     updatedAt: toDateStr(i.updatedAt),
   }
@@ -219,8 +275,21 @@ function serializeIncome(i: Awaited<ReturnType<typeof prisma.income.findFirst>>)
 
 export async function getIncomes(groupId: string, eventId?: string): Promise<Income[]> {
   await requireGroupOwner(groupId)
+  if (eventId) {
+    const event = await prisma.appEvent.findFirst({ where: { id: eventId, groupId }, select: { id: true } })
+    if (!event) throw new Error("Forbidden")
+  }
   const items = await prisma.income.findMany({
     where: eventId ? { eventId } : { groupId },
+    orderBy: { date: "desc" },
+  })
+  return items.map(serializeIncome)
+}
+
+export async function getIncomesByEvent(eventId: string): Promise<Income[]> {
+  await requireEventMember(eventId)
+  const items = await prisma.income.findMany({
+    where: { eventId },
     orderBy: { date: "desc" },
   })
   return items.map(serializeIncome)
@@ -230,7 +299,17 @@ export async function createIncome(
   data: Omit<Income, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: Income } | { success: false; error: string }> {
   try {
-    await requireGroupOwner(data.groupId)
+    let resolvedGroupId = data.groupId
+    let createdBy: string | null = null
+
+    if (data.eventId) {
+      const { session, groupId } = await requireEventMember(data.eventId)
+      resolvedGroupId = groupId
+      createdBy = session.user.id
+    } else {
+      await requireGroupOwner(data.groupId)
+    }
+
     const i = await prisma.income.create({
       data: {
         title: data.title,
@@ -241,12 +320,14 @@ export async function createIncome(
         recurring: data.recurring,
         frequency: data.frequency ?? null,
         nextDate: data.nextDate ? new Date(data.nextDate) : null,
-        groupId: data.groupId,
+        groupId: resolvedGroupId,
         eventId: data.eventId ?? null,
+        createdBy,
       },
     })
     return { success: true, data: serializeIncome(i) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }
@@ -272,6 +353,7 @@ export async function updateIncome(
     })
     return { success: true, data: serializeIncome(i) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }
@@ -279,12 +361,23 @@ export async function updateIncome(
 
 export async function deleteIncome(id: string): Promise<{ success: boolean }> {
   try {
-    const existing = await prisma.income.findUnique({ where: { id }, select: { groupId: true } })
+    const existing = await prisma.income.findUnique({
+      where: { id },
+      select: { groupId: true, eventId: true, createdBy: true },
+    })
     if (!existing) return { success: false }
-    await requireGroupOwner(existing.groupId)
+
+    if (existing.eventId) {
+      const { session, isOwner } = await requireEventMember(existing.eventId)
+      if (!isOwner && existing.createdBy !== session.user.id) throw new Error("Forbidden")
+    } else {
+      await requireGroupOwner(existing.groupId)
+    }
+
     await prisma.income.delete({ where: { id } })
     return { success: true }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false }
   }
@@ -305,6 +398,7 @@ function serializeLoan(l: Awaited<ReturnType<typeof prisma.loan.findFirst>>): Lo
     notes: l.notes ?? undefined,
     groupId: l.groupId,
     eventId: l.eventId ?? undefined,
+    createdBy: l.createdBy ?? undefined,
     createdAt: toDateStr(l.createdAt),
     updatedAt: toDateStr(l.updatedAt),
   }
@@ -312,8 +406,21 @@ function serializeLoan(l: Awaited<ReturnType<typeof prisma.loan.findFirst>>): Lo
 
 export async function getLoans(groupId: string, eventId?: string): Promise<Loan[]> {
   await requireGroupOwner(groupId)
+  if (eventId) {
+    const event = await prisma.appEvent.findFirst({ where: { id: eventId, groupId }, select: { id: true } })
+    if (!event) throw new Error("Forbidden")
+  }
   const items = await prisma.loan.findMany({
     where: eventId ? { eventId } : { groupId },
+    orderBy: { startDate: "desc" },
+  })
+  return items.map(serializeLoan)
+}
+
+export async function getLoansByEvent(eventId: string): Promise<Loan[]> {
+  await requireEventMember(eventId)
+  const items = await prisma.loan.findMany({
+    where: { eventId },
     orderBy: { startDate: "desc" },
   })
   return items.map(serializeLoan)
@@ -323,7 +430,17 @@ export async function createLoan(
   data: Omit<Loan, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: Loan } | { success: false; error: string }> {
   try {
-    await requireGroupOwner(data.groupId)
+    let resolvedGroupId = data.groupId
+    let createdBy: string | null = null
+
+    if (data.eventId) {
+      const { session, groupId } = await requireEventMember(data.eventId)
+      resolvedGroupId = groupId
+      createdBy = session.user.id
+    } else {
+      await requireGroupOwner(data.groupId)
+    }
+
     const l = await prisma.loan.create({
       data: {
         direction: data.direction,
@@ -333,12 +450,14 @@ export async function createLoan(
         startDate: new Date(data.startDate),
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
         notes: data.notes ?? null,
-        groupId: data.groupId,
+        groupId: resolvedGroupId,
         eventId: data.eventId ?? null,
+        createdBy,
       },
     })
     return { success: true, data: serializeLoan(l) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }
@@ -364,6 +483,7 @@ export async function updateLoan(
     })
     return { success: true, data: serializeLoan(l) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }
@@ -371,12 +491,23 @@ export async function updateLoan(
 
 export async function deleteLoan(id: string): Promise<{ success: boolean }> {
   try {
-    const existing = await prisma.loan.findUnique({ where: { id }, select: { groupId: true } })
+    const existing = await prisma.loan.findUnique({
+      where: { id },
+      select: { groupId: true, eventId: true, createdBy: true },
+    })
     if (!existing) return { success: false }
-    await requireGroupOwner(existing.groupId)
+
+    if (existing.eventId) {
+      const { session, isOwner } = await requireEventMember(existing.eventId)
+      if (!isOwner && existing.createdBy !== session.user.id) throw new Error("Forbidden")
+    } else {
+      await requireGroupOwner(existing.groupId)
+    }
+
     await prisma.loan.delete({ where: { id } })
     return { success: true }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false }
   }
@@ -397,10 +528,21 @@ function serializeRepayment(r: Awaited<ReturnType<typeof prisma.loanRepayment.fi
   }
 }
 
+async function requireLoanAccess(loanId: string) {
+  const loan = await prisma.loan.findUnique({
+    where: { id: loanId },
+    select: { groupId: true, eventId: true },
+  })
+  if (!loan) throw new Error("Forbidden")
+  if (loan.eventId) {
+    await requireEventMember(loan.eventId)
+  } else {
+    await requireGroupOwner(loan.groupId)
+  }
+}
+
 export async function getRepayments(loanId: string): Promise<LoanRepayment[]> {
-  const loan = await prisma.loan.findUnique({ where: { id: loanId }, select: { groupId: true } })
-  if (!loan) return []
-  await requireGroupOwner(loan.groupId)
+  await requireLoanAccess(loanId)
   const items = await prisma.loanRepayment.findMany({
     where: { loanId },
     orderBy: { date: "asc" },
@@ -423,9 +565,7 @@ export async function createRepayment(
   data: Omit<LoanRepayment, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: LoanRepayment } | { success: false; error: string }> {
   try {
-    const loan = await prisma.loan.findUnique({ where: { id: data.loanId }, select: { groupId: true } })
-    if (!loan) return { success: false, error: "Loan not found" }
-    await requireGroupOwner(loan.groupId)
+    await requireLoanAccess(data.loanId)
     const r = await prisma.loanRepayment.create({
       data: {
         loanId: data.loanId,
@@ -436,6 +576,7 @@ export async function createRepayment(
     })
     return { success: true, data: serializeRepayment(r) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }
@@ -445,12 +586,11 @@ export async function deleteRepayment(id: string): Promise<{ success: boolean }>
   try {
     const repayment = await prisma.loanRepayment.findUnique({ where: { id }, select: { loanId: true } })
     if (!repayment) return { success: false }
-    const loan = await prisma.loan.findUnique({ where: { id: repayment.loanId }, select: { groupId: true } })
-    if (!loan) return { success: false }
-    await requireGroupOwner(loan.groupId)
+    await requireLoanAccess(repayment.loanId)
     await prisma.loanRepayment.delete({ where: { id } })
     return { success: true }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false }
   }
@@ -486,9 +626,7 @@ export async function createAdvance(
   data: Omit<LoanAdvance, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: LoanAdvance } | { success: false; error: string }> {
   try {
-    const loan = await prisma.loan.findUnique({ where: { id: data.loanId }, select: { groupId: true } })
-    if (!loan) return { success: false, error: "Loan not found" }
-    await requireGroupOwner(loan.groupId)
+    await requireLoanAccess(data.loanId)
     const a = await prisma.loanAdvance.create({
       data: {
         loanId: data.loanId,
@@ -499,6 +637,7 @@ export async function createAdvance(
     })
     return { success: true, data: serializeAdvance(a) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }

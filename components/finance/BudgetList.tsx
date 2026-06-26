@@ -10,7 +10,7 @@ import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
 import { type Budget, type Category } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getBudgets, createBudget, updateBudget, deleteBudget } from "@/lib/actions/finance"
+import { getBudgets, getBudgetsByEvent, createBudget, updateBudget, deleteBudget } from "@/lib/actions/finance"
 
 type TabType = "monthly" | "yearly"
 type SortKey = "updatedAt" | "createdAt" | "amount" | "spent"
@@ -50,7 +50,7 @@ type FormState = {
 
 export function BudgetList({ expenseCategories }: { expenseCategories: Category[] }) {
   const EMPTY_FORM: FormState = { name: "", category: expenseCategories[0]?.name ?? "", type: "monthly", amount: "", eventId: "" }
-  const { activeGroup, activeEvent, events } = useGroup()
+  const { activeGroup, activeEvent, events, isSharedEvent, activeEventGroupId } = useGroup()
   const queryClient = useQueryClient()
   const currency = activeGroup.currency
   const formCardRef = useRef<HTMLDivElement>(null)
@@ -65,11 +65,18 @@ export function BudgetList({ expenseCategories }: { expenseCategories: Category[
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 
   const { data: budgetList = [] } = useQuery({
-    queryKey: ["budgets", activeGroup.id, activeEvent?.id ?? null],
-    queryFn: () => getBudgets(activeGroup.id, activeEvent?.id),
+    queryKey: isSharedEvent && activeEvent
+      ? ["budgets", "event", activeEvent.id]
+      : ["budgets", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: isSharedEvent && activeEvent
+      ? () => getBudgetsByEvent(activeEvent.id)
+      : () => getBudgets(activeGroup.id, activeEvent?.id),
   })
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["budgets", activeGroup.id] })
+  const budgetsQueryKey = isSharedEvent && activeEvent
+    ? ["budgets", "event", activeEvent.id]
+    : ["budgets", activeGroup.id, activeEvent?.id ?? null]
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: budgetsQueryKey })
   const createMutation = useMutation({ mutationFn: createBudget, onSuccess: invalidate })
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Budget, "id" | "createdAt" | "updatedAt">> }) =>
@@ -144,8 +151,8 @@ export function BudgetList({ expenseCategories }: { expenseCategories: Category[
         period: form.type === "monthly"
           ? new Date().toLocaleDateString("en-AU", { month: "long", year: "numeric" })
           : String(new Date().getFullYear()),
-        groupId: activeGroup.id,
-        ...(form.eventId ? { eventId: form.eventId } : {}),
+        groupId: activeEventGroupId,
+        ...(isSharedEvent && activeEvent ? { eventId: activeEvent.id } : form.eventId ? { eventId: form.eventId } : {}),
       })
       if (result.success) closeForm()
     }
@@ -287,6 +294,7 @@ export function BudgetList({ expenseCategories }: { expenseCategories: Category[
                     <input
                       id="budget-amount"
                       type="number"
+                      inputMode="decimal"
                       placeholder="0.00"
                       value={form.amount}
                       onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
@@ -295,7 +303,7 @@ export function BudgetList({ expenseCategories }: { expenseCategories: Category[
                   </div>
                 </div>
 
-                {groupEvents.length > 0 && (
+                {!isSharedEvent && groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
                     <label htmlFor="budget-event" className="text-xs text-muted-foreground font-medium">Event (optional)</label>
                     <select
@@ -334,9 +342,10 @@ export function BudgetList({ expenseCategories }: { expenseCategories: Category[
             className="flex flex-col gap-0"
           >
             {filtered.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No {activeTab} budgets
-              </p>
+              <div className="py-8 flex flex-col items-center gap-2">
+                <Target className="size-7 text-muted-foreground/30" />
+                <p className="text-sm text-muted-foreground">No {activeTab} budgets</p>
+              </div>
             ) : (
               filtered.map((b, i) => {
                 const status = getStatusClasses(b.spent, b.amount)

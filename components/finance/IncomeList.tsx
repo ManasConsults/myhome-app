@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button"
 import { cn, formatCurrency, getCurrencySymbol } from "@/lib/utils"
 import { type Income, type Category } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
+import { useAuth } from "@/components/providers/AuthProvider"
 import { EventFilter } from "@/components/ui/EventFilter"
+import { SharedEventBanner } from "@/components/layout/SharedEventBanner"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getIncomes, createIncome, updateIncome, deleteIncome } from "@/lib/actions/finance"
+import { getIncomes, getIncomesByEvent, createIncome, updateIncome, deleteIncome } from "@/lib/actions/finance"
 
 type Tab = "all" | "recurring" | "one-off"
 type Frequency = "weekly" | "fortnightly" | "monthly" | "yearly"
@@ -71,7 +73,8 @@ const itemVariants = {
 
 export function IncomeList({ incomeCategories }: { incomeCategories: Category[] }) {
   const iconMap = Object.fromEntries(incomeCategories.map((c) => [c.name, c.icon]))
-  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events, isSharedEvent, activeEventGroupId } = useGroup()
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const currency = activeGroup.currency
   const formCardRef = useRef<HTMLDivElement>(null)
@@ -83,11 +86,18 @@ export function IncomeList({ incomeCategories }: { incomeCategories: Category[] 
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const { data: incomes = [] } = useQuery({
-    queryKey: ["incomes", activeGroup.id, activeEvent?.id ?? null],
-    queryFn: () => getIncomes(activeGroup.id, activeEvent?.id),
+    queryKey: isSharedEvent && activeEvent
+      ? ["incomes", "event", activeEvent.id]
+      : ["incomes", activeGroup.id, activeEvent?.id ?? null],
+    queryFn: isSharedEvent && activeEvent
+      ? () => getIncomesByEvent(activeEvent.id)
+      : () => getIncomes(activeGroup.id, activeEvent?.id),
   })
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["incomes", activeGroup.id] })
+  const incomesQueryKey = isSharedEvent && activeEvent
+    ? ["incomes", "event", activeEvent.id]
+    : ["incomes", activeGroup.id, activeEvent?.id ?? null]
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: incomesQueryKey })
   const createMutation = useMutation({ mutationFn: createIncome, onSuccess: invalidate })
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Income, "id" | "createdAt" | "updatedAt">> }) =>
@@ -188,7 +198,8 @@ export function IncomeList({ incomeCategories }: { incomeCategories: Category[] 
     } else {
       const result = await createMutation.mutateAsync({
         ...shared,
-        groupId: activeGroup.id,
+        groupId: activeEventGroupId,
+        ...(isSharedEvent && activeEvent ? { eventId: activeEvent.id } : {}),
         ...(recurring ? {} : { frequency: undefined, nextDate: undefined }),
       })
       if (result.success) closeForm()
@@ -196,6 +207,10 @@ export function IncomeList({ incomeCategories }: { incomeCategories: Category[] 
   }
 
   async function handleDelete(id: string) {
+    if (isSharedEvent) {
+      const income = incomes.find((i) => i.id === id)
+      if (income?.createdBy !== user?.id) return
+    }
     await deleteMutation.mutateAsync(id)
     setDeleteId(null)
   }
@@ -271,7 +286,9 @@ export function IncomeList({ incomeCategories }: { incomeCategories: Category[] 
             })}
           </div>
         </div>
-        {groupEvents.length > 0 && (
+        {isSharedEvent ? (
+          <div className="mt-2"><SharedEventBanner /></div>
+        ) : groupEvents.length > 0 && (
           <div className="mt-2">
             <EventFilter
               events={groupEvents}
@@ -298,8 +315,9 @@ export function IncomeList({ incomeCategories }: { incomeCategories: Category[] 
                 <p className="text-sm font-medium">{editingId ? "Edit income" : "New income"}</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Title</label>
+                    <label htmlFor="inc-title" className="text-xs text-muted-foreground font-medium">Title</label>
                     <input
+                      id="inc-title"
                       type="text"
                       placeholder="e.g. Monthly salary"
                       value={title}
@@ -309,11 +327,13 @@ export function IncomeList({ incomeCategories }: { incomeCategories: Category[] 
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Amount</label>
+                    <label htmlFor="inc-amount" className="text-xs text-muted-foreground font-medium">Amount</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">{getCurrencySymbol(currency)}</span>
                       <input
+                        id="inc-amount"
                         type="number"
+                        inputMode="decimal"
                         min="0.01"
                         step="0.01"
                         placeholder="0.00"
@@ -328,8 +348,9 @@ export function IncomeList({ incomeCategories }: { incomeCategories: Category[] 
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Category</label>
+                    <label htmlFor="inc-category" className="text-xs text-muted-foreground font-medium">Category</label>
                     <select
+                      id="inc-category"
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -340,8 +361,9 @@ export function IncomeList({ incomeCategories }: { incomeCategories: Category[] 
                     </select>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Date</label>
+                    <label htmlFor="inc-date" className="text-xs text-muted-foreground font-medium">Date</label>
                     <input
+                      id="inc-date"
                       type="date"
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
@@ -356,6 +378,7 @@ export function IncomeList({ incomeCategories }: { incomeCategories: Category[] 
                     type="button"
                     role="switch"
                     aria-checked={recurring}
+                    aria-label="Recurring"
                     onClick={() => setRecurring((v) => !v)}
                     className={cn(
                       "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
@@ -391,10 +414,11 @@ export function IncomeList({ incomeCategories }: { incomeCategories: Category[] 
                   </AnimatePresence>
                 </div>
 
-                {groupEvents.length > 0 && (
+                {!isSharedEvent && groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
+                    <label htmlFor="inc-event" className="text-xs text-muted-foreground font-medium">Event (optional)</label>
                     <select
+                      id="inc-event"
                       value={eventId}
                       onChange={(e) => setEventId(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -514,6 +538,7 @@ export function IncomeList({ incomeCategories }: { incomeCategories: Category[] 
                           >
                             <Pencil className="size-3.5" />
                           </button>
+                          {(!isSharedEvent || income.createdBy === user?.id) && (
                           <button
                             onClick={() => setDeleteId(income.id)}
                             className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
@@ -521,6 +546,7 @@ export function IncomeList({ incomeCategories }: { incomeCategories: Category[] 
                           >
                             <Trash2 className="size-3.5" />
                           </button>
+                          )}
                         </div>
                       )}
                     </div>

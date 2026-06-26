@@ -8,14 +8,17 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { type Task, type Category } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
+import { useAuth } from "@/components/providers/AuthProvider"
 import { TaskList } from "@/components/dashboard/TaskList"
 import { EventFilter } from "@/components/ui/EventFilter"
+import { SharedEventBanner } from "@/components/layout/SharedEventBanner"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getTasks, createTask, updateTask, deleteTask } from "@/lib/actions/tasks"
+import { getTasks, getTasksByEvent, createTask, updateTask, deleteTask } from "@/lib/actions/tasks"
 
 export function TasksSection({ categories }: { categories: Category[] }) {
   const iconMap = Object.fromEntries(categories.map((c) => [c.name, c.icon]))
-  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events, isSharedEvent, activeEventGroupId } = useGroup()
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   const formCardRef = useRef<HTMLDivElement>(null)
@@ -31,13 +34,18 @@ export function TasksSection({ categories }: { categories: Category[] }) {
   useEffect(() => { setDue(new Date().toISOString().slice(0, 10)) }, [])
   useEffect(() => { setEventId(activeEvent?.id ?? "") }, [activeEvent?.id])
 
+  const queryKey = isSharedEvent && activeEvent
+    ? ["tasks", "event", activeEvent.id]
+    : ["tasks", activeGroup.id, activeEvent?.id ?? null]
+
   const { data: taskList = [] } = useQuery({
-    queryKey: ["tasks", activeGroup.id, activeEvent?.id ?? null],
-    queryFn: () => getTasks(activeGroup.id, activeEvent?.id),
+    queryKey,
+    queryFn: isSharedEvent && activeEvent
+      ? () => getTasksByEvent(activeEvent.id)
+      : () => getTasks(activeGroup.id, activeEvent?.id),
   })
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["tasks", activeGroup.id] })
+  const invalidate = () => queryClient.invalidateQueries({ queryKey })
 
   const createMutation = useMutation({ mutationFn: createTask, onSuccess: invalidate })
   const updateMutation = useMutation({
@@ -120,16 +128,22 @@ export function TasksSection({ categories }: { categories: Category[] }) {
         done: false,
         due,
         icon: iconMap[category] ?? "📌",
-        groupId: activeGroup.id,
-        ...(eventId ? { eventId } : {}),
+        groupId: activeEventGroupId,
+        ...(isSharedEvent && activeEvent ? { eventId: activeEvent.id } : eventId ? { eventId } : {}),
       })
       if (result.success) closeForm()
     }
   }
 
   async function handleDelete(id: string) {
+    if (isSharedEvent) {
+      const task = taskList.find((t) => t.id === id)
+      if (task?.createdBy !== user?.id) return
+    }
     await deleteMutation.mutateAsync(id)
   }
+
+  const canDeleteTask = (task: Task) => !isSharedEvent || task.createdBy === user?.id
 
   return (
     <>
@@ -149,12 +163,16 @@ export function TasksSection({ categories }: { categories: Category[] }) {
         ))}
       </div>
 
-      {groupEvents.length > 0 && (
-        <EventFilter
-          events={groupEvents}
-          activeEvent={activeEvent}
-          onSelect={(id) => id ? setActiveEvent(id) : clearActiveEvent()}
-        />
+      {isSharedEvent ? (
+        <SharedEventBanner />
+      ) : (
+        groupEvents.length > 0 && (
+          <EventFilter
+            events={groupEvents}
+            activeEvent={activeEvent}
+            onSelect={(id) => id ? setActiveEvent(id) : clearActiveEvent()}
+          />
+        )
       )}
 
       <Card ref={formCardRef} className="border-border/60">
@@ -238,7 +256,7 @@ export function TasksSection({ categories }: { categories: Category[] }) {
                   />
                 </div>
 
-                {groupEvents.length > 0 && (
+                {!isSharedEvent && groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
                     <label htmlFor="task-event" className="text-xs text-muted-foreground font-medium">Event (optional)</label>
                     <select
@@ -271,7 +289,12 @@ export function TasksSection({ categories }: { categories: Category[] }) {
         </AnimatePresence>
       </Card>
 
-      <TaskList data={taskList} onEdit={openEdit} onDelete={handleDelete} />
+      <TaskList
+        data={taskList}
+        onEdit={openEdit}
+        onDelete={handleDelete}
+        canDelete={canDeleteTask}
+      />
     </>
   )
 }

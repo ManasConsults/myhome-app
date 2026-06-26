@@ -2,7 +2,8 @@
 
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
-import type { AppEvent } from "@/lib/types"
+import type { AppEvent, SharedEvent } from "@/lib/types"
+import { unstable_rethrow } from "next/navigation"
 import { requireSession, requireGroupOwner } from "./_auth-guard"
 
 function serialize(e: Awaited<ReturnType<typeof prisma.appEvent.findFirst>>): AppEvent {
@@ -62,6 +63,7 @@ export async function createEvent(
     })
     return { success: true, data: serialize(e) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }
@@ -85,9 +87,39 @@ export async function updateEvent(
     })
     return { success: true, data: serialize(e) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }
+}
+
+export async function getSharedEventsByUser(): Promise<SharedEvent[]> {
+  const session = await requireSession()
+  const memberships = await prisma.eventMember.findMany({
+    where: { userId: session.user.id },
+    include: {
+      event: {
+        include: { group: { select: { name: true, currency: true, icon: true, user: { select: { name: true } } } } },
+      },
+    },
+    orderBy: { event: { startDate: "asc" } },
+  })
+  return memberships.map(({ event: e }) => ({
+    id: e.id,
+    groupId: e.groupId,
+    name: e.name,
+    description: e.description ?? undefined,
+    icon: e.icon,
+    color: e.color as AppEvent["color"],
+    startDate: toDateStr(e.startDate),
+    endDate: e.endDate ? toDateStr(e.endDate) : undefined,
+    createdAt: toDateStr(e.createdAt),
+    updatedAt: toDateStr(e.updatedAt),
+    sharedByName: e.group.user.name,
+    groupName: e.group.name,
+    groupCurrency: e.group.currency,
+    groupIcon: e.group.icon,
+  }))
 }
 
 export async function deleteEvent(id: string): Promise<{ success: boolean; error?: string }> {
@@ -98,6 +130,7 @@ export async function deleteEvent(id: string): Promise<{ success: boolean; error
     await prisma.appEvent.delete({ where: { id } })
     return { success: true }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }

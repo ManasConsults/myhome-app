@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import { ShoppingCart, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
+import { cn, formatCurrency } from "@/lib/utils"
 import { type ShoppingItem } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
 import { useQuery } from "@tanstack/react-query"
@@ -24,10 +24,12 @@ interface ShoppingListProps {
   data?: ShoppingItem[]
   onEdit?: (item: ShoppingItem) => void
   onDelete?: (id: string) => void
+  canDelete?: (item: ShoppingItem) => boolean
 }
 
-export function ShoppingList({ data, onEdit, onDelete }: ShoppingListProps) {
+export function ShoppingList({ data, onEdit, onDelete, canDelete }: ShoppingListProps) {
   const { activeGroup } = useGroup()
+  const currency = activeGroup.currency
   const { data: fetchedItems = [] } = useQuery<ShoppingItem[]>({
     queryKey: ["shopping", activeGroup.id, null],
     queryFn: () => getShoppingItems(activeGroup.id),
@@ -80,8 +82,8 @@ export function ShoppingList({ data, onEdit, onDelete }: ShoppingListProps) {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-sm font-semibold">${remaining.toFixed(2)}</p>
-            <p className="text-xs text-muted-foreground">of ${totalEstimate.toFixed(2)} est.</p>
+            <p className="text-sm font-semibold">{formatCurrency(remaining, currency)}</p>
+            <p className="text-xs text-muted-foreground">of {formatCurrency(totalEstimate, currency)} est.</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 mt-3">
@@ -202,7 +204,7 @@ export function ShoppingList({ data, onEdit, onDelete }: ShoppingListProps) {
                             "text-sm font-medium",
                             done && "text-muted-foreground line-through"
                           )}>
-                            ${item.estimatedPrice.toFixed(2)}
+                            {formatCurrency(item.estimatedPrice, currency)}
                           </p>
                           <Badge
                             variant="outline"
@@ -220,7 +222,7 @@ export function ShoppingList({ data, onEdit, onDelete }: ShoppingListProps) {
                             <Pencil className="size-3.5" />
                           </button>
                         )}
-                        {onDelete && (
+                        {onDelete && (!canDelete || canDelete(item)) && (
                           <button
                             onClick={() => setDeleteId(item.id)}
                             className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"

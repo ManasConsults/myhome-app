@@ -8,10 +8,14 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { type Note, type Category } from "@/lib/types"
 import { useGroup } from "@/components/providers/GroupProvider"
+import { useAuth } from "@/components/providers/AuthProvider"
 import { NotesGrid } from "@/components/notes/NotesGrid"
 import { EventFilter } from "@/components/ui/EventFilter"
+import { SharedEventBanner } from "@/components/layout/SharedEventBanner"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getNotes, createNote, updateNote, deleteNote } from "@/lib/actions/notes"
+import { getNotes, getNotesByEvent, createNote, updateNote, deleteNote } from "@/lib/actions/notes"
+
+const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
 
 const COLORS: { value: Note["color"]; label: string }[] = [
   { value: "default", label: "Default" },
@@ -22,7 +26,8 @@ const COLORS: { value: Note["color"]; label: string }[] = [
 ]
 
 export function NotesSection({ categories }: { categories: Category[] }) {
-  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events } = useGroup()
+  const { activeGroup, activeEvent, setActiveEvent, clearActiveEvent, events, isSharedEvent, activeEventGroupId } = useGroup()
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   const formCardRef = useRef<HTMLDivElement>(null)
@@ -38,13 +43,18 @@ export function NotesSection({ categories }: { categories: Category[] }) {
 
   useEffect(() => { setEventId(activeEvent?.id ?? "") }, [activeEvent?.id])
 
+  const queryKey = isSharedEvent && activeEvent
+    ? ["notes", "event", activeEvent.id]
+    : ["notes", activeGroup.id, activeEvent?.id ?? null]
+
   const { data: noteList = [] } = useQuery({
-    queryKey: ["notes", activeGroup.id, activeEvent?.id ?? null],
-    queryFn: () => getNotes(activeGroup.id, activeEvent?.id),
+    queryKey,
+    queryFn: isSharedEvent && activeEvent
+      ? () => getNotesByEvent(activeEvent.id)
+      : () => getNotes(activeGroup.id, activeEvent?.id),
   })
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["notes", activeGroup.id] })
+  const invalidate = () => queryClient.invalidateQueries({ queryKey })
 
   const createMutation = useMutation({ mutationFn: createNote, onSuccess: invalidate })
   const updateMutation = useMutation({
@@ -56,8 +66,6 @@ export function NotesSection({ categories }: { categories: Category[] }) {
 
   const groupEvents = events.filter((e) => e.groupId === activeGroup.id)
 
-  // eslint-disable-next-line react-hooks/purity
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
   const total = noteList.length
   const pinnedCount = noteList.filter((n) => n.pinned).length
   const categoryCount = new Set(noteList.map((n) => n.category)).size
@@ -129,16 +137,22 @@ export function NotesSection({ categories }: { categories: Category[] }) {
         category,
         pinned,
         color,
-        groupId: activeGroup.id,
-        ...(eventId ? { eventId } : {}),
+        groupId: activeEventGroupId,
+        ...(isSharedEvent && activeEvent ? { eventId: activeEvent.id } : eventId ? { eventId } : {}),
       })
       if (result.success) closeForm()
     }
   }
 
   async function handleDelete(id: string) {
+    if (isSharedEvent) {
+      const note = noteList.find((n) => n.id === id)
+      if (note?.createdBy !== user?.id) return
+    }
     await deleteMutation.mutateAsync(id)
   }
+
+  const canDeleteNote = (note: (typeof noteList)[0]) => !isSharedEvent || note.createdBy === user?.id
 
   return (
     <>
@@ -158,12 +172,16 @@ export function NotesSection({ categories }: { categories: Category[] }) {
         ))}
       </div>
 
-      {groupEvents.length > 0 && (
-        <EventFilter
-          events={groupEvents}
-          activeEvent={activeEvent}
-          onSelect={(id) => id ? setActiveEvent(id) : clearActiveEvent()}
-        />
+      {isSharedEvent ? (
+        <SharedEventBanner />
+      ) : (
+        groupEvents.length > 0 && (
+          <EventFilter
+            events={groupEvents}
+            activeEvent={activeEvent}
+            onSelect={(id) => id ? setActiveEvent(id) : clearActiveEvent()}
+          />
+        )
       )}
 
       <Card ref={formCardRef} className="border-border/60">
@@ -197,8 +215,9 @@ export function NotesSection({ categories }: { categories: Category[] }) {
                 <p className="text-sm font-medium">{editingId ? "Edit note" : "New note"}</p>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-muted-foreground font-medium">Title</label>
+                  <label htmlFor="note-title" className="text-xs text-muted-foreground font-medium">Title</label>
                   <input
+                    id="note-title"
                     type="text"
                     placeholder="Note title"
                     value={title}
@@ -209,8 +228,9 @@ export function NotesSection({ categories }: { categories: Category[] }) {
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-muted-foreground font-medium">Content</label>
+                  <label htmlFor="note-content" className="text-xs text-muted-foreground font-medium">Content</label>
                   <textarea
+                    id="note-content"
                     placeholder="Write your note..."
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
@@ -222,8 +242,9 @@ export function NotesSection({ categories }: { categories: Category[] }) {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Category</label>
+                    <label htmlFor="note-category" className="text-xs text-muted-foreground font-medium">Category</label>
                     <select
+                      id="note-category"
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -232,8 +253,9 @@ export function NotesSection({ categories }: { categories: Category[] }) {
                     </select>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Color</label>
+                    <label htmlFor="note-color" className="text-xs text-muted-foreground font-medium">Color</label>
                     <select
+                      id="note-color"
                       value={color}
                       onChange={(e) => setColor(e.target.value as Note["color"])}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -248,6 +270,7 @@ export function NotesSection({ categories }: { categories: Category[] }) {
                     type="button"
                     role="switch"
                     aria-checked={pinned}
+                    aria-label="Pin note"
                     onClick={() => setPinned((v) => !v)}
                     className={cn(
                       "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
@@ -262,10 +285,11 @@ export function NotesSection({ categories }: { categories: Category[] }) {
                   <span className="text-sm font-medium">Pin note</span>
                 </div>
 
-                {groupEvents.length > 0 && (
+                {!isSharedEvent && groupEvents.length > 0 && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-muted-foreground font-medium">Event (optional)</label>
+                    <label htmlFor="note-event" className="text-xs text-muted-foreground font-medium">Event (optional)</label>
                     <select
+                      id="note-event"
                       value={eventId}
                       onChange={(e) => setEventId(e.target.value)}
                       className="h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -294,7 +318,7 @@ export function NotesSection({ categories }: { categories: Category[] }) {
         </AnimatePresence>
       </Card>
 
-      <NotesGrid data={noteList} onEdit={openEdit} onDelete={handleDelete} />
+      <NotesGrid data={noteList} onEdit={openEdit} onDelete={handleDelete} canDelete={canDeleteNote} />
     </>
   )
 }

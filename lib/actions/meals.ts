@@ -3,7 +3,8 @@
 import { prisma } from "@/lib/db/prisma"
 import { toDateStr } from "@/lib/utils"
 import type { Recipe, DayMeals } from "@/lib/types"
-import { requireSession, requireGroupOwner } from "./_auth-guard"
+import { unstable_rethrow } from "next/navigation"
+import { requireSession, requireGroupOwner, requireEventMember } from "./_auth-guard"
 
 // ─── Recipe ──────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,7 @@ export async function createRecipe(
     })
     return { success: true, data: serializeRecipe(r) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }
@@ -61,6 +63,7 @@ export async function updateRecipe(
     const r = await prisma.recipe.update({ where: { id }, data })
     return { success: true, data: serializeRecipe(r) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }
@@ -72,6 +75,7 @@ export async function deleteRecipe(id: string): Promise<{ success: boolean }> {
     await prisma.recipe.delete({ where: { id } })
     return { success: true }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false }
   }
@@ -95,8 +99,21 @@ function serializeDayMeals(d: Awaited<ReturnType<typeof prisma.dayMeals.findFirs
 
 export async function getMealPlan(groupId: string, eventId?: string): Promise<DayMeals[]> {
   await requireGroupOwner(groupId)
+  if (eventId) {
+    const event = await prisma.appEvent.findFirst({ where: { id: eventId, groupId }, select: { id: true } })
+    if (!event) throw new Error("Forbidden")
+  }
   const items = await prisma.dayMeals.findMany({
     where: eventId ? { eventId } : { groupId },
+    orderBy: { day: "asc" },
+  })
+  return items.map(serializeDayMeals)
+}
+
+export async function getMealPlanByEvent(eventId: string): Promise<DayMeals[]> {
+  await requireEventMember(eventId)
+  const items = await prisma.dayMeals.findMany({
+    where: { eventId },
     orderBy: { day: "asc" },
   })
   return items.map(serializeDayMeals)
@@ -106,34 +123,34 @@ export async function upsertDayMeals(
   data: Omit<DayMeals, "createdAt" | "updatedAt">,
 ): Promise<{ success: true; data: DayMeals } | { success: false; error: string }> {
   try {
-    await requireGroupOwner(data.groupId)
+    let resolvedGroupId = data.groupId
+
+    if (data.eventId) {
+      const { groupId } = await requireEventMember(data.eventId)
+      resolvedGroupId = groupId
+    } else {
+      await requireGroupOwner(data.groupId)
+    }
+
     // Postgres treats NULL != NULL in unique constraints, so upsert doesn't work
     // when eventId is null — must use findFirst + conditional create/update instead
     const existing = await prisma.dayMeals.findFirst({
       where: data.eventId
-        ? { groupId: data.groupId, eventId: data.eventId, day: data.day }
-        : { groupId: data.groupId, eventId: null, day: data.day },
+        ? { groupId: resolvedGroupId, eventId: data.eventId, day: data.day }
+        : { groupId: resolvedGroupId, eventId: null, day: data.day },
     })
 
-    const payload = {
-      breakfast: data.breakfast,
-      lunch: data.lunch,
-      dinner: data.dinner,
-    }
+    const payload = { breakfast: data.breakfast, lunch: data.lunch, dinner: data.dinner }
 
     const result = existing
       ? await prisma.dayMeals.update({ where: { id: existing.id }, data: payload })
       : await prisma.dayMeals.create({
-          data: {
-            ...payload,
-            day: data.day,
-            groupId: data.groupId,
-            eventId: data.eventId ?? null,
-          },
+          data: { ...payload, day: data.day, groupId: resolvedGroupId, eventId: data.eventId ?? null },
         })
 
     return { success: true, data: serializeDayMeals(result) }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false, error: "Something went wrong" }
   }
@@ -141,17 +158,19 @@ export async function upsertDayMeals(
 
 export async function deleteDayMeals(groupId: string, day: string, eventId?: string): Promise<{ success: boolean }> {
   try {
-    await requireGroupOwner(groupId)
-    const existing = await prisma.dayMeals.findFirst({
-      where: eventId
-        ? { groupId, eventId, day }
-        : { groupId, eventId: null, day },
-    })
-    if (existing) {
-      await prisma.dayMeals.delete({ where: { id: existing.id } })
+    if (eventId) {
+      await requireEventMember(eventId)
+    } else {
+      await requireGroupOwner(groupId)
     }
+
+    const existing = await prisma.dayMeals.findFirst({
+      where: eventId ? { groupId, eventId, day } : { groupId, eventId: null, day },
+    })
+    if (existing) await prisma.dayMeals.delete({ where: { id: existing.id } })
     return { success: true }
   } catch (e) {
+    unstable_rethrow(e)
     if (e instanceof Error && (e.message === "Unauthenticated" || e.message === "Forbidden")) throw e
     return { success: false }
   }
